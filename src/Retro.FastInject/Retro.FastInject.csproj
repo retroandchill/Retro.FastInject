@@ -44,12 +44,12 @@
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-      <DocumentationFile>D:\dev\Retro.FastInject\src\Retro.FastInject\bin\Debug\netstandard2.0\Retro.FastInject.xml</DocumentationFile>
+      <DocumentationFile>$(MSBuildProjectDirectory)\bin\$(Configuration)\netstandard2.0\Retro.FastInject.xml</DocumentationFile>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
       <DebugSymbols>true</DebugSymbols>
-      <DocumentationFile>D:\dev\Retro.FastInject\src\Retro.FastInject\bin\Release\netstandard2.0\Retro.FastInject.xml</DocumentationFile>
+      <DocumentationFile>$(MSBuildProjectDirectory)\bin\$(Configuration)\netstandard2.0\Retro.FastInject.xml</DocumentationFile>
     </PropertyGroup>
 
     <Target Name="GetDependencyTargetPaths">

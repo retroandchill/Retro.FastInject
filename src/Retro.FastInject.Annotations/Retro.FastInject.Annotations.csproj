@@ -15,4 +15,11 @@
       <DocumentationFile>bin\Release\Retro.FastInject.Annotations.xml</DocumentationFile>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="aqua.tool.polyfill.IsExternalInit" Version="2.2.9">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+    </ItemGroup>
+
 </Project>

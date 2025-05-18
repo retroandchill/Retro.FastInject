@@ -46,6 +46,6 @@ public class DependencyAttribute(Type type, ServiceScope scope) : Attribute {
   /// <value>
   /// A <see cref="System.String"/> representing the key for identifying a particular registration in the container.
   /// </value>
-  public string? Key { get; set; }
+  public string? Key { get; init; }
 
 }
