@@ -7,6 +7,8 @@ using Retro.FastInject.Core;
 
 namespace {{Namespace}};
 
+#nullable enable
+
 partial class {{ClassName}} : IServiceProvider, 
     {{#RegularServices}}
     IServiceProvider<{{ServiceType}}>,
@@ -23,9 +25,6 @@ partial class {{ClassName}} : IServiceProvider,
   {{#Singletons}}
   private {{Type}}? {{Name}};     
   {{/Singletons}}
-  {{#KeyedSingletons}}
-  private {{Type}}? {{Name}};     
-  {{/KeyedSingletons}}
   private readonly List<DisposableWrapper> _disposables = [];
   
   private Scope GetRootScope() {
@@ -46,7 +45,12 @@ partial class {{ClassName}} : IServiceProvider,
 
   {{#RegularServices}}
   {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
-    {{InitializerBody}}
+    {{#FromOtherService}}
+    return ((IServiceProvider<{{OtherType}}>) this).GetService();  
+    {{/FromOtherService}}
+    {{#IsSingleton}}
+    return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}());
+    {{/IsSingleton}}
   }  
   {{/RegularServices}}
 
@@ -68,12 +72,11 @@ partial class {{ClassName}} : IServiceProvider,
   }
 
   {{#KeyedServices}}
-  {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
+  {{ServiceType}} IKeyedServiceProvider<{{ServiceType}}>.GetService(string serviceKey) {
     {{#IsImplementation}}
     {{InitializerBody}}  
     {{/IsImplementation}}
-    
-  }  
+  }
   {{/KeyedServices}}  
 
   public IServiceScope CreateScope() {
@@ -107,17 +110,6 @@ partial class {{ClassName}} : IServiceProvider,
   private ValueTask TryDispose(IAsyncDisposable? disposable) {
     return disposable?.DisposeAsync() ?? default;
 
-  }
-    
-  IKeyedSingleton? IKeyedServiceProvider<IKeyedSingleton>.GetKeyedService(string serviceKey) {
-    return ((IKeyedServiceProvider<KeyedSingleton>) this).GetKeyedService(serviceKey);
-  }
-
-  KeyedSingleton? IKeyedServiceProvider<KeyedSingleton>.GetKeyedService(string serviceKey) {
-    return serviceKey switch {
-        "dummy_key" => LazyInitializer.EnsureInitialized(ref _keyedSingleton, () => new KeyedSingleton()),
-        _ => null
-    };
   }
 
   public partial class Scope : IServiceProvider, 

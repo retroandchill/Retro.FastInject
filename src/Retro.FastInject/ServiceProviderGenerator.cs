@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using HandlebarsDotNet;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Retro.FastInject.Annotations;
@@ -43,11 +44,39 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
   }
 
   private static void Execute(Compilation compilation, INamedTypeSymbol classSymbol, SourceProductionContext context) {
-    var dependencies = classSymbol.GetInjectedServices()
-        .ToList();
+    var manifest = classSymbol.GenerateManifest();
 
-    // TODO: Generate the actual service provider implementation using the collected dependencies
-    // This will be implemented in the next part
+    var templateParams = new {
+        Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
+        ClassName = classSymbol.Name,
+        RegularServices = manifest.GetUnnamedServices()
+            .Select(x => new {
+                ServiceType = x.Type,
+                FromOtherService = x.ImplementationType is not null,
+                OtherType = x.ImplementationType?.ToDisplayString(),
+                IsSingleton = x.ImplementationType is null && x.Lifetime == ServiceScope.Singleton,
+                x.FieldName
+            })
+            .ToList(),
+        KeyedServices = manifest.GetKeyedServices()
+            .Select(x => new {
+                ServiceType = x.Type.ToDisplayString(),
+            })
+            .ToList(),
+        Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
+            .Where(x => x.ImplementationType is null)
+            .Select(x => new {
+                Type = x.Type.ToDisplayString(),
+                Name = x.FieldName
+            })
+    };
+
+    var template = Handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
+    
+    var templateResult = template(templateParams);
+    context.AddSource("ServiceProvider.g.cs", templateResult);
+    
+    Console.WriteLine(manifest.ToString());
   }
 
   
