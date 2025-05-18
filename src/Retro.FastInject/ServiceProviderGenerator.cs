@@ -46,11 +46,41 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
   private static void Execute(Compilation compilation, INamedTypeSymbol classSymbol, SourceProductionContext context) {
     var manifest = classSymbol.GenerateManifest();
 
+    // Validate constructor dependencies for all service implementations
+    foreach (var service in manifest.GetUnnamedServices().Concat(manifest.GetKeyedServices())) {
+      try {
+        manifest.CheckConstructorDependencies(service.ImplementationType ?? service.Type);
+      } catch (InvalidOperationException ex) {
+        context.ReportDiagnostic(Diagnostic.Create(
+          new DiagnosticDescriptor(
+            "FastInject001",
+            "Dependency Injection Error",
+            ex.Message,
+            "DependencyInjection",
+            DiagnosticSeverity.Error,
+            true
+          ),
+          classSymbol.Locations.FirstOrDefault()
+        ));
+      }
+    }
+  
+    // Prepare constructor resolution information for template
+    var constructorResolutions = manifest.GetAllConstructorResolutions()
+        .Select(cr => new {
+            cr.Type,
+            Parameters = cr.Parameters.Select(p => {
+              var type = p.ParameterType.ToDisplayString();
+              return p.Key is not null ? $"((IKeyedServiceProvider<{type}>) this).GetKeyedService({p.Key})" : $"((IServiceProvider<{type}>) this).GetService()";
+            }).Joining(", ")
+        })
+        .ToDictionary(x => x.Type, x => x.Parameters, TypeSymbolEqualityComparer.Instance);
+  
     var templateParams = new {
         Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
         ClassName = classSymbol.Name,
         RegularServices = manifest.GetUnnamedServices()
-            .Select(x => new ServiceInjection(x))
+            .Select(x => new ServiceInjection(x, constructorResolutions.TryGetValue(x.Type, out var parameters) ? parameters : ""))
             .ToList(),
         KeyedServices = manifest.GetKeyedServices()
             .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
@@ -58,14 +88,15 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                 ServiceType = x.Key.ToDisplayString(),
                 FromOtherService = manifest.TryGetIndirectService(x.Key, out var implementationType),
                 OtherType = implementationType?.ToDisplayString(),
-                Options = x.Select(y => new ServiceInjection(y)).ToList()
+                Options = x.Select(y => new ServiceInjection(y, constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : "")).ToList()
             })
             .ToList(),
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
             .Where(x => x.ImplementationType is null)
             .Select(x => new {
                 Type = x.Type.ToDisplayString(),
-                Name = x.FieldName
+                Name = x.FieldName,
+                Parameters = constructorResolutions.TryGetValue(x.Type, out var parameters) ? parameters : ""
             }),
         Scoped = manifest.GetServicesByLifetime(ServiceScope.Scoped)
             .Where(x => x.ImplementationType is null)
@@ -75,7 +106,9 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
             }),
     };
 
-    var template = Handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
+    var handlebars = Handlebars.Create();
+    handlebars.Configuration.TextEncoder = null;
+    var template = handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
     
     var templateResult = template(templateParams);
     context.AddSource("ServiceProvider.g.cs", templateResult);
