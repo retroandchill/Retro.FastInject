@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\src\Retro.FastInject.Annotations\Retro.FastInject.Annotations.csproj" />
         <ProjectReference Include="..\..\src\Retro.FastInject.Core\Retro.FastInject.Core.csproj" />
         <ProjectReference Include="..\..\src\Retro.FastInject.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
