@@ -20,7 +20,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Retro.FastInject.csproj"/>
+        <ProjectReference Include="..\..\src\Retro.FastInject.Annotations\Retro.FastInject.Annotations.csproj" />
+        <ProjectReference Include="..\..\src\Retro.FastInject\Retro.FastInject.csproj"/>
+        <ProjectReference Include="..\..\src\Retro.FastInject\Retro.FastInject.csproj" />
     </ItemGroup>
 
 
