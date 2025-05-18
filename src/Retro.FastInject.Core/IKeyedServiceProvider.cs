@@ -2,6 +2,6 @@
 
 public interface IKeyedServiceProvider<out T> {
   
-  T GetKeyedService(object? serviceKey);
+  T? GetKeyedService(string serviceKey);
   
 }

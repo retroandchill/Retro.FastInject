@@ -4,27 +4,28 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
-using Retro.FastInject.Sample.Services;
 
-namespace Retro.FastInject.Sample;
+namespace {{Namespace}};
 
-public partial class SampleServiceProvider : IServiceProvider, 
-                                            IServiceProvider<ISingletonService>,
-                                            IServiceProvider<SingletonService>,
-                                            IServiceProvider<IScopedService>,
-                                            IServiceProvider<ScopedService>,
-                                            IServiceProvider<ITransientService>,
-                                            IServiceProvider<TransientService>,
-                                            IKeyedServiceProvider, 
-                                            IKeyedServiceProvider<IKeyedSingleton>,
-                                            IKeyedServiceProvider<KeyedSingleton>,
-                                            IServiceScopeFactory, 
-                                            IDisposable, 
-                                            IAsyncDisposable {
+partial class {{ClassName}} : IServiceProvider, 
+    {{#RegularServices}}
+    IServiceProvider<{{ServiceType}}>,
+    {{/RegularServices}}
+    IKeyedServiceProvider,
+    {{#KeyedServices}}
+    IKeyedServiceProvider<{{ServiceType}}>,
+    {{/KeyedServices}}
+    IServiceScopeFactory, 
+    IDisposable, 
+    IAsyncDisposable {
 
   private Scope? _rootScope;
-  private SingletonService? _singletonService;
-  private KeyedSingleton? _keyedSingleton;
+  {{#Singletons}}
+  private {{Type}}? {{Name}};     
+  {{/Singletons}}
+  {{#KeyedSingletons}}
+  private {{Type}}? {{Name}};     
+  {{/KeyedSingletons}}
   private readonly List<DisposableWrapper> _disposables = [];
   
   private Scope GetRootScope() {
@@ -36,30 +37,24 @@ public partial class SampleServiceProvider : IServiceProvider,
       return this;
     }
 
-    if (serviceType == typeof(ISingletonService)) {
-      return ((IServiceProvider<ISingletonService>) this).GetService();
-    }
-    
-    if (serviceType == typeof(SingletonService)) {
-      return ((IServiceProvider<SingletonService>) this).GetService();
-    }
-    
-    if (serviceType == typeof(ScopedService)) {
-      return ((IServiceProvider<ScopedService>) this).GetService();
-    }
-    
-    if (serviceType == typeof(ITransientService)) {
-      return ((IServiceProvider<ITransientService>) this).GetService();
-    }
-    
-    if (serviceType == typeof(TransientService)) {
-      return ((IServiceProvider<TransientService>) this).GetService();
-    }
+    {{#RegularServices}}
+    if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) this).GetService();
+    {{/RegularServices}}
     
     return null;
   }
 
+  {{#RegularServices}}
+  {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
+    {{InitializerBody}}
+  }  
+  {{/RegularServices}}
+
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
+    {{#KeyedServices}}
+    if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) this).GetKeyedService(serviceKey);
+    {{/KeyedServices}}
+    
     return null;
   }
 
@@ -68,9 +63,18 @@ public partial class SampleServiceProvider : IServiceProvider,
     if (service == null) {
       throw new InvalidOperationException($"Service of type '{serviceType}' with key '{serviceKey}' cannot be resolved.");
     }
-    
+
     return service;
   }
+
+  {{#KeyedServices}}
+  {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
+    {{#IsImplementation}}
+    {{InitializerBody}}  
+    {{/IsImplementation}}
+    
+  }  
+  {{/KeyedServices}}  
 
   public IServiceScope CreateScope() {
     return new Scope(this);
@@ -78,45 +82,31 @@ public partial class SampleServiceProvider : IServiceProvider,
 
   public void Dispose() {
     _rootScope?.Dispose();
+    
+    {{#Disposables}}
+    {{VariableName}}?.Dispose();
+    {{/Disposables}}
+
     foreach (var disposable in _disposables) {
-      disposable.Dispose();    
+      disposable.Dispose();
     }
   }
 
   public async ValueTask DisposeAsync() {
     await TryDispose(_rootScope);
+
+    {{#AsyncDisposables}}
+    if ({{VariableName}} is not null) await {{VariableName}}.DisposeAsync();
+    {{/AsyncDisposables}}
+
     foreach (var disposable in _disposables) {
-      await disposable.DisposeAsync();    
+      await disposable.DisposeAsync();
     }
   }
 
   private ValueTask TryDispose(IAsyncDisposable? disposable) {
     return disposable?.DisposeAsync() ?? default;
 
-  }
-
-  ISingletonService IServiceProvider<ISingletonService>.GetService() {
-    return ((IServiceProvider<SingletonService>) this).GetService();
-  }
-
-  SingletonService IServiceProvider<SingletonService>.GetService() {
-    return LazyInitializer.EnsureInitialized(ref _singletonService, () => new SingletonService());
-  }
-
-  IScopedService IServiceProvider<IScopedService>.GetService() {
-    return ((IServiceProvider<IScopedService>) this).GetService();
-  }
-
-  ScopedService IServiceProvider<ScopedService>.GetService() {
-    return ((IServiceProvider<ScopedService>) GetRootScope()).GetService();
-  }
-
-  ITransientService IServiceProvider<ITransientService>.GetService() {
-    return ((IServiceProvider<TransientService>) this).GetService();
-  }
-
-  TransientService IServiceProvider<TransientService>.GetService() {
-    return new TransientService();
   }
     
   IKeyedSingleton? IKeyedServiceProvider<IKeyedSingleton>.GetKeyedService(string serviceKey) {
