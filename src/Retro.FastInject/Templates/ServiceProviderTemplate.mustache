@@ -51,13 +51,21 @@ partial class {{ClassName}} : IServiceProvider,
     {{#IsSingleton}}
     return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}());
     {{/IsSingleton}}
+    {{#IsScoped}}
+    return ((IServiceProvider<{{ServiceType}}>) GetRootScope()).GetService();    
+    {{/IsScoped}}
+    {{#IsTransient}}
+    return new {{ServiceType}}();    
+    {{/IsTransient}}
   }  
   {{/RegularServices}}
 
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
-    {{#KeyedServices}}
-    if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) this).GetKeyedService(serviceKey);
-    {{/KeyedServices}}
+    if (serviceKey is string asString) {
+      {{#KeyedServices}}
+      if (serviceType == typeof({{ServiceType}})) return ((IKeyedServiceProvider<{{ServiceType}}>) this).GetKeyedService(asString);
+      {{/KeyedServices}}
+    }
     
     return null;
   }
@@ -72,10 +80,32 @@ partial class {{ClassName}} : IServiceProvider,
   }
 
   {{#KeyedServices}}
-  {{ServiceType}} IKeyedServiceProvider<{{ServiceType}}>.GetService(string serviceKey) {
-    {{#IsImplementation}}
-    {{InitializerBody}}  
-    {{/IsImplementation}}
+  {{ServiceType}}? IKeyedServiceProvider<{{ServiceType}}>.GetKeyedService(string serviceKey) {
+    {{#FromOtherService}}
+    return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);  
+    {{/FromOtherService}}
+    {{^FromOtherService}}    
+    switch (serviceKey) {
+      {{#Options}}
+      case "{{Key}}": {
+        {{#FromOtherService}}
+        return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);    
+        {{/FromOtherService}}
+        {{#IsSingleton}}
+        return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}());
+        {{/IsSingleton}}
+        {{#IsScoped}}
+        return ((IKeyedServiceProvider<{{ServiceType}}>) GetRootScope()).GetKeyedService(serviceKey);    
+        {{/IsScoped}}
+        {{#IsTransient}}
+        return new {{ServiceType}}();    
+        {{/IsTransient}}
+      }
+      {{/Options}}
+      default:
+        return null;
+    };    
+    {{/FromOtherService}}
   }
   {{/KeyedServices}}  
 
@@ -113,19 +143,21 @@ partial class {{ClassName}} : IServiceProvider,
   }
 
   public partial class Scope : IServiceProvider, 
+                       {{#RegularServices}}
+                       IServiceProvider<{{ServiceType}}>,
+                       {{/RegularServices}}
                        IKeyedServiceProvider,
                        IServiceScope,
-                       IServiceProvider<ISingletonService>,
-                       IServiceProvider<SingletonService>,
-                       IServiceProvider<IScopedService>,
-                       IServiceProvider<ScopedService>,
-                       IServiceProvider<ITransientService>,
-                       IServiceProvider<TransientService>, 
+                       {{#KeyedServices}}
+                       IKeyedServiceProvider<{{ServiceType}}>,
+                       {{/KeyedServices}}
                        IDisposable, 
                        IAsyncDisposable {
     
     private readonly SampleServiceProvider _root;
-    private ScopedService? _scopedService;
+    {{#Scoped}}
+    private {{Type}}? {{Name}};     
+    {{/Scoped}}
     private readonly List<DisposableWrapper> _disposables = [];
 
     public IServiceProvider ServiceProvider => this;
@@ -135,42 +167,85 @@ partial class {{ClassName}} : IServiceProvider,
     }
 
     public object? GetService(Type serviceType) {
-      throw new NotImplementedException();
+      if (serviceType == typeof(IServiceProvider)) {
+        return this;
+      }  
+      
+      if (serviceType == typeof(IServiceScopeFactory)) {
+        return _root;
+      }
+      {{#RegularServices}}
+      if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) this).GetService();
+      {{/RegularServices}}  
+      
+      return null;
     }
 
+    {{#RegularServices}}
+    {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
+      {{#FromOtherService}}
+      return ((IServiceProvider<{{OtherType}}>) this).GetService();  
+      {{/FromOtherService}}
+      {{#IsSingleton}}
+      return ((IServiceProvider<{{ServiceType}}>) _root).GetService();  
+      {{/IsSingleton}}
+      {{#IsScoped}}
+      return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}());
+      {{/IsScoped}}
+      {{#IsTransient}}
+      return new {{ServiceType}}();    
+      {{/IsTransient}}
+    }  
+    {{/RegularServices}}
+
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
-      throw new NotImplementedException();
+      if (serviceKey is string asString) {
+        {{#KeyedServices}}
+        if (serviceType == typeof({{ServiceType}})) return ((IKeyedServiceProvider<{{ServiceType}}>) this).GetKeyedService(asString);
+        {{/KeyedServices}}
+      }
+    
+      return null;
     }
 
     public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
-      throw new NotImplementedException();
+      var service = GetKeyedService(serviceType, serviceKey);
+      if (service == null) {
+        throw new InvalidOperationException($"Service of type '{serviceType}' with key '{serviceKey}' cannot be resolved.");
+      }
+
+      return service;
     }
 
-    ISingletonService IServiceProvider<ISingletonService>.GetService() {
-      return ((IServiceProvider<ISingletonService>) _root).GetService();
+    {{#KeyedServices}}
+    {{ServiceType}}? IKeyedServiceProvider<{{ServiceType}}>.GetKeyedService(string serviceKey) {
+      {{#FromOtherService}}
+      return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);      
+      {{/FromOtherService}}
+      {{^FromOtherService}}
+      switch (serviceKey) {
+        {{#Options}}
+        case "{{Key}}": {
+          {{#FromOtherService}}
+          return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);    
+          {{/FromOtherService}}
+          {{#IsSingleton}}
+          return ((IKeyedServiceProvider<{{ServiceType}}>) _root).GetKeyedService(serviceKey); 
+          {{/IsSingleton}}
+          {{#IsScoped}}
+          return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}());
+          {{/IsScoped}}
+          {{#IsTransient}}
+          return new {{ServiceType}}();    
+          {{/IsTransient}}
+        }
+        {{/Options}}
+        default:
+          return null;
+      };
+      {{/FromOtherService}}
     }
-
-    SingletonService IServiceProvider<SingletonService>.GetService() {
-      return ((IServiceProvider<SingletonService>) _root).GetService();
-    }
-
-    IScopedService IServiceProvider<IScopedService>.GetService() {
-      return ((IServiceProvider<ScopedService>) this).GetService();
-    }
-
-    ScopedService IServiceProvider<ScopedService>.GetService() {
-      var singletonService = ((IServiceProvider<ISingletonService>) this).GetService();
-      var transientService = ((IServiceProvider<ITransientService>) this).GetService();
-      return LazyInitializer.EnsureInitialized(ref _scopedService, () => new ScopedService(singletonService, transientService));
-    }
-
-    ITransientService IServiceProvider<ITransientService>.GetService() {
-      return ((IServiceProvider<ITransientService>) _root).GetService();
-    }
-
-    TransientService IServiceProvider<TransientService>.GetService() {
-      return ((IServiceProvider<TransientService>) _root).GetService();
-    }
+    {{/KeyedServices}}  
 
     public void Dispose() {
       foreach (var disposable in _disposables) {

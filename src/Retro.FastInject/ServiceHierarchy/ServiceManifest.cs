@@ -36,6 +36,10 @@ public class ServiceManifest {
     _indirectServices[serviceType] = implementationType;
   }
 
+  public bool TryGetIndirectService(ITypeSymbol serviceType, out ITypeSymbol? implementationType) {
+    return _indirectServices.TryGetValue(serviceType, out implementationType);
+  }
+
   public void AddBaseType(ITypeSymbol baseType) {
     _baseTypes.Add(baseType);
   }

@@ -50,17 +50,15 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
         ClassName = classSymbol.Name,
         RegularServices = manifest.GetUnnamedServices()
-            .Select(x => new {
-                ServiceType = x.Type,
-                FromOtherService = x.ImplementationType is not null,
-                OtherType = x.ImplementationType?.ToDisplayString(),
-                IsSingleton = x.ImplementationType is null && x.Lifetime == ServiceScope.Singleton,
-                x.FieldName
-            })
+            .Select(x => new ServiceInjection(x))
             .ToList(),
         KeyedServices = manifest.GetKeyedServices()
+            .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
             .Select(x => new {
-                ServiceType = x.Type.ToDisplayString(),
+                ServiceType = x.Key.ToDisplayString(),
+                FromOtherService = manifest.TryGetIndirectService(x.Key, out var implementationType),
+                OtherType = implementationType?.ToDisplayString(),
+                Options = x.Select(y => new ServiceInjection(y)).ToList()
             })
             .ToList(),
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
@@ -68,7 +66,13 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
             .Select(x => new {
                 Type = x.Type.ToDisplayString(),
                 Name = x.FieldName
-            })
+            }),
+        Scoped = manifest.GetServicesByLifetime(ServiceScope.Scoped)
+            .Where(x => x.ImplementationType is null)
+            .Select(x => new {
+                Type = x.Type.ToDisplayString(),
+                Name = x.FieldName
+            }),
     };
 
     var template = Handlebars.Compile(SourceTemplates.ServiceProviderTemplate);

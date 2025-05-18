@@ -43,8 +43,11 @@ public static class ServiceManifestGenerator {
 
       // If this is an indirect service (interface -> implementation),
       // add the relationship
-      if (implementations.Count == 1 && !serviceType.Equals(implementations[0].Type, SymbolEqualityComparer.Default)) {
-        manifest.AddIndirectService(serviceType, implementations[0].Type);
+      var distinctTypes = implementations.Select(x => x.Type)
+          .Distinct(TypeSymbolEqualityComparer.Instance)
+          .ToList();
+      if (distinctTypes.Count == 1 && !serviceType.Equals(distinctTypes[0], SymbolEqualityComparer.Default)) {
+        manifest.AddIndirectService(serviceType, distinctTypes[0]);
       }
     }
 
