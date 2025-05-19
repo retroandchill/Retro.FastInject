@@ -1,5 +1,14 @@
-﻿namespace Retro.FastInject.Sample.Services;
+﻿using System;
+using System.Threading.Tasks;
 
-public class TransientService : ITransientService {
-  
+namespace Retro.FastInject.Sample.Services;
+
+public sealed class TransientService : ITransientService, IDisposable, IAsyncDisposable {
+  public void Dispose() {
+    throw new NotImplementedException();
+  }
+
+  public ValueTask DisposeAsync() {
+    throw new NotImplementedException();
+  }
 }

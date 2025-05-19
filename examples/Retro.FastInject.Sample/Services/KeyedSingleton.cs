@@ -1,5 +1,9 @@
-﻿namespace Retro.FastInject.Sample.Services;
+﻿using System;
 
-public class KeyedSingleton : IKeyedSingleton {
-  
+namespace Retro.FastInject.Sample.Services;
+
+public sealed class KeyedSingleton : IKeyedSingleton, IDisposable {
+  public void Dispose() {
+    throw new NotImplementedException();
+  }
 }

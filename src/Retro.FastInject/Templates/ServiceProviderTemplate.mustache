@@ -55,7 +55,19 @@ partial class {{ClassName}} : IServiceProvider,
     return ((IServiceProvider<{{ServiceType}}>) GetRootScope()).GetService();    
     {{/IsScoped}}
     {{#IsTransient}}
-    return {{InitializingStatement}}; 
+    var service = {{InitializingStatement}};   
+    {{#DoubleDisposable}}
+    _disposables.Add(new DisposableWrapper(service, service));    
+    {{/DoubleDisposable}} 
+    {{^DoubleDisposable}}
+    {{#IsDisposable}}
+    _disposables.Add(new DisposableWrapper(service, null));    
+    {{/IsDisposable}}
+    {{#IsAsyncDisposable}}
+    _disposables.Add(new DisposableWrapper(null, service));    
+    {{/IsAsyncDisposable}}
+    {{/DoubleDisposable}} 
+    return service; 
     {{/IsTransient}}
   }  
   {{/RegularServices}}
@@ -98,7 +110,19 @@ partial class {{ClassName}} : IServiceProvider,
         return ((IKeyedServiceProvider<{{ServiceType}}>) GetRootScope()).GetKeyedService(serviceKey);    
         {{/IsScoped}}
         {{#IsTransient}}
-        return {{InitializingStatement}};   
+        var service = {{InitializingStatement}};   
+        {{#DoubleDisposable}}
+        _disposables.Add(new DisposableWrapper(service, service));    
+        {{/DoubleDisposable}} 
+        {{^DoubleDisposable}}
+        {{#IsDisposable}}
+        _disposables.Add(new DisposableWrapper(service, null));    
+        {{/IsDisposable}}
+        {{#IsAsyncDisposable}}
+        _disposables.Add(new DisposableWrapper(null, service));    
+        {{/IsAsyncDisposable}}
+        {{/DoubleDisposable}} 
+        return service;  
         {{/IsTransient}}
       }
       {{/Options}}
@@ -116,9 +140,11 @@ partial class {{ClassName}} : IServiceProvider,
   public void Dispose() {
     _rootScope?.Dispose();
     
-    {{#Disposables}}
-    {{VariableName}}?.Dispose();
-    {{/Disposables}}
+    {{#Singletons}}
+    {{#IsDisposable}}
+    {{Name}}?.Dispose();
+    {{/IsDisposable}}
+    {{/Singletons}}
 
     foreach (var disposable in _disposables) {
       disposable.Dispose();
@@ -126,20 +152,22 @@ partial class {{ClassName}} : IServiceProvider,
   }
 
   public async ValueTask DisposeAsync() {
-    await TryDispose(_rootScope);
+    if (_rootScope is not null) await _rootScope.DisposeAsync();
 
-    {{#AsyncDisposables}}
-    if ({{VariableName}} is not null) await {{VariableName}}.DisposeAsync();
-    {{/AsyncDisposables}}
+    {{#Singletons}}
+    {{#IsAsyncDisposable}}
+    if ({{Name}} != null) await {{Name}}.DisposeAsync();
+    {{/IsAsyncDisposable}}
+    {{^IsAsyncDisposable}}
+    {{#IsDisposable}}
+    {{Name}}?.Dispose();
+    {{/IsDisposable}}    
+    {{/IsAsyncDisposable}}    
+    {{/Singletons}}
 
     foreach (var disposable in _disposables) {
       await disposable.DisposeAsync();
     }
-  }
-
-  private ValueTask TryDispose(IAsyncDisposable? disposable) {
-    return disposable?.DisposeAsync() ?? default;
-
   }
 
   public partial class Scope : IServiceProvider, 
@@ -193,7 +221,19 @@ partial class {{ClassName}} : IServiceProvider,
       return {{InitializingStatement}};
       {{/IsScoped}}
       {{#IsTransient}}
-      return ((IServiceProvider<{{ServiceType}}>) _root).GetService();    
+      var service = {{ScopedTransientInitializer}};  
+      {{#DoubleDisposable}}
+      _disposables.Add(new DisposableWrapper(service, service));    
+      {{/DoubleDisposable}} 
+      {{^DoubleDisposable}}
+      {{#IsDisposable}}
+      _disposables.Add(new DisposableWrapper(service, null));    
+      {{/IsDisposable}}
+      {{#IsAsyncDisposable}}
+      _disposables.Add(new DisposableWrapper(null, service));    
+      {{/IsAsyncDisposable}}
+      {{/DoubleDisposable}} 
+      return service;   
       {{/IsTransient}}
     }  
     {{/RegularServices}}
@@ -236,7 +276,19 @@ partial class {{ClassName}} : IServiceProvider,
           return {{InitializingStatement}}; 
           {{/IsScoped}}
           {{#IsTransient}}
-          return ((IServiceProvider<{{ServiceType}}>) _root).GetService();    
+          var service = {{ScopedTransientInitializer}};  
+          {{#DoubleDisposable}}
+          _disposables.Add(new DisposableWrapper(service, service));    
+          {{/DoubleDisposable}} 
+          {{^DoubleDisposable}}
+          {{#IsDisposable}}
+          _disposables.Add(new DisposableWrapper(service, null));    
+          {{/IsDisposable}}
+          {{#IsAsyncDisposable}}
+          _disposables.Add(new DisposableWrapper(null, service));    
+          {{/IsAsyncDisposable}}
+          {{/DoubleDisposable}} 
+          return service;  
           {{/IsTransient}}
         }
         {{/Options}}
@@ -248,12 +300,29 @@ partial class {{ClassName}} : IServiceProvider,
     {{/KeyedServices}}  
 
     public void Dispose() {
+      {{#Scoped}}
+      {{#IsDisposable}}
+      {{Name}}?.Dispose();
+      {{/IsDisposable}}
+      {{/Scoped}}  
+        
       foreach (var disposable in _disposables) {
         disposable.Dispose();     
       }
     }
 
     public async ValueTask DisposeAsync() {
+      {{#Scoped}}
+      {{#IsAsyncDisposable}}
+      if ({{Name}} != null) await {{Name}}.DisposeAsync();
+      {{/IsAsyncDisposable}}
+      {{^IsAsyncDisposable}}
+      {{#IsDisposable}}
+      {{Name}}?.Dispose();
+      {{/IsDisposable}}
+      {{/IsAsyncDisposable}}
+      {{/Scoped}} 
+
       foreach (var disposable in _disposables) {
         await disposable.DisposeAsync();     
       }

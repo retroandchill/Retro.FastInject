@@ -102,13 +102,18 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
             .Where(x => x.ImplementationType is null && x.AssociatedSymbol is not IFieldSymbol and not IPropertySymbol)
             .Select(x => new {
                 Type = x.Type.ToDisplayString(),
-                Name = x.FieldName
+                Name = x.FieldName,
+                x.IsDisposable,
+                x.IsAsyncDisposable
             }),
         Scoped = manifest.GetServicesByLifetime(ServiceScope.Scoped)
             .Where(x => x.ImplementationType is null)
             .Select(x => new {
                 Type = x.Type.ToDisplayString(),
-                Name = x.FieldName
+                Name = x.FieldName,
+                x.IsDisposable,
+                x.IsAsyncDisposable
+                
             }),
     };
 

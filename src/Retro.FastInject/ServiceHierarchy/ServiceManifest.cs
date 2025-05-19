@@ -173,7 +173,9 @@ public class ServiceManifest {
         Lifetime = lifetime,
         ImplementationType = implementationType is null || implementationType.Equals(serviceType, SymbolEqualityComparer.Default) ? null : implementationType,
         IndexForType = registrations.Count,
-        AssociatedSymbol = associatedSymbol
+        AssociatedSymbol = associatedSymbol,
+        IsDisposable = serviceType.AllInterfaces.Any(i => i.IsOfType<IDisposable>()),
+        IsAsyncDisposable = serviceType.AllInterfaces.Any(i => i.ToDisplayString() == "System.IAsyncDisposable")
     });
   }
 

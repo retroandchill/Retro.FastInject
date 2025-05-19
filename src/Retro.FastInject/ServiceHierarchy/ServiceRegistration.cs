@@ -79,6 +79,19 @@ public record ServiceRegistration {
     }
   }
 
+  /// Indicates whether the registered service implements the `IDisposable` interface.
+  /// This property is determined based on whether the service type or its implementation
+  /// explicitly implements `IDisposable`. It allows the dependency injection system to
+  /// identify services that require disposal and handle them appropriately during the
+  /// cleanup process.
+  public required bool IsDisposable { get; init; }
+
+  /// Indicates whether the service being registered implements the `System.IAsyncDisposable` interface.
+  /// This property is used to determine if the service requires asynchronous disposal during its lifecycle.
+  /// It ensures that services implementing `IAsyncDisposable` are properly disposed using an asynchronous
+  /// pattern when they go out of scope in the dependency injection framework.
+  public required bool IsAsyncDisposable { get; init; }
+
   /// <summary>
   /// Generates the initialization statement for the service registration, which includes
   /// resolving service dependencies and handling lifetime-specific logic.
@@ -88,9 +101,9 @@ public record ServiceRegistration {
   /// A string representing the initializing statement for the service, accounting for its
   /// associated lifetime, type, and any relevant symbols.
   /// </returns>
-  public string GetInitializingStatement(string parameters) {
+  public string GetInitializingStatement(string parameters, bool scopedTransient = false) {
     var basicBody = AssociatedSymbol switch {
-        IMethodSymbol method => $"{GetMethodInvocation(method)}({parameters})",
+        IMethodSymbol method => $"{GetMethodInvocation(method, scopedTransient)}({parameters})",
         IPropertySymbol or IFieldSymbol => $"{AssociatedSymbol.Name}",
         _ => $"new {Type.ToDisplayString()}({parameters})"
     };
@@ -106,11 +119,11 @@ public record ServiceRegistration {
 
   }
 
-  private string GetMethodInvocation(IMethodSymbol method) {
+  private string GetMethodInvocation(IMethodSymbol method, bool scopedTransient) {
     if (method.IsStatic) {
       return method.ToDisplayString();
     }
     
-    return Lifetime == ServiceScope.Singleton ? $"_root.{method.Name}" : method.Name;
+    return Lifetime == ServiceScope.Singleton || scopedTransient ? $"_root.{method.Name}" : method.Name;
   }
 }

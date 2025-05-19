@@ -54,6 +54,7 @@ public class ServiceProviderGeneratorTests {
     // Arrange
     const string source = """
 
+                          using System;
                           using Retro.FastInject.Annotations;
 
                           namespace TestNamespace
@@ -62,10 +63,20 @@ public class ServiceProviderGeneratorTests {
                               public class TestService : ITestService {}
                               public interface IScopedService {}
                               public class ScopedService : IScopedService {}
+                              public interface ITransientService {}
+                              public class TransientService : ITransientService, IDisposable, IAsyncDisposable {
+                                public void Dispose() {
+                                }
+                                
+                                public ValueTask DisposeAsync() {
+                                  return default;
+                                }
+                              }
 
                               [ServiceProvider]
                               [Singleton<TestService>]
                               [Scoped<ScopedService>]
+                              [Transient<TransientService>]
                               public partial class TestServiceProvider
                               {
                               }

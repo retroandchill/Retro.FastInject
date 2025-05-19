@@ -103,4 +103,38 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// initialization and caching of the service instance.
   /// </remarks>
   public string InitializingStatement { get; } = registration.GetInitializingStatement(parameters);
+
+  /// <summary>
+  /// Gets the initialization statement for scoped or transient service lifetime, specifically formatted
+  /// to handle these lifetimes differently during service injection.
+  /// </summary>
+  /// <remarks>
+  /// This property retrieves the initialization logic for services registered with a scoped or transient
+  /// lifetime in dependency injection. This differs from the default initialization logic by including
+  /// additional handling for scoped and transient lifetimes when creating instances.
+  /// </remarks>
+  public string ScopedTransientInitializer { get; } = registration.GetInitializingStatement(parameters, true);
+
+  /// <summary>
+  /// Indicates whether the service associated with this injection is disposable.
+  /// </summary>
+  /// <remarks>
+  /// This property determines if the injected service implements <see cref="System.IDisposable"/>.
+  /// The value is derived from the associated <see cref="ServiceRegistration"/> and reflects the
+  /// disposable nature of the service's lifecycle, which may require explicit resource cleanup.
+  /// </remarks>
+  public bool IsDisposable { get; } = registration.IsDisposable;
+
+  /// <summary>
+  /// Gets a value indicating whether the service associated with this injection
+  /// is capable of asynchronous disposal.
+  /// </summary>
+  /// <remarks>
+  /// This property determines if the service implements the <c>IAsyncDisposable</c> interface,
+  /// allowing it to be disposed of asynchronously. The information is derived from the
+  /// <see cref="ServiceRegistration"/> associated with this injection.
+  /// </remarks>
+  public bool IsAsyncDisposable { get; } = registration.IsAsyncDisposable;
+  
+  public bool DoubleDisposable { get; } = registration.IsDisposable && registration.IsAsyncDisposable;
 }
