@@ -8,13 +8,14 @@ namespace Retro.FastInject.Sample;
 [Singleton<KeyedSingleton>(Key = "keyed")]
 [Scoped<ScopedService>]
 [Transient<TransientService>]
+[Singleton<ValueService>]
 public partial class SampleServiceProvider(int value, float simpleValue) {
 
   [Instance]
   private float SimpleValue { get; } = simpleValue;
 
   [Factory(ServiceScope.Transient)]
-  public FactoryConstructedService CreateFactoryConstructedService() {
+  private FactoryConstructedService CreateFactoryConstructedService() {
     return new FactoryConstructedService(value);
   }
   

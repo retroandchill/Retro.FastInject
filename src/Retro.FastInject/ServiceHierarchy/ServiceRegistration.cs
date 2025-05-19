@@ -95,12 +95,15 @@ public record ServiceRegistration {
         _ => $"new {Type.ToDisplayString()}({parameters})"
     };
 
-    if (Lifetime != ServiceScope.Transient && AssociatedSymbol is not IPropertySymbol and not IFieldSymbol) {
-      return
-          $"{typeof(LazyInitializer).FullName}.{nameof(LazyInitializer.EnsureInitialized)}(ref {FieldName}, () => {basicBody})";
-    } 
+    if (Lifetime == ServiceScope.Transient || AssociatedSymbol is IPropertySymbol or IFieldSymbol) return basicBody;
     
-    return basicBody;
+    if (Type.IsValueType) {
+      return $"InitializationUtils.EnsureValueInitialized(ref {FieldName}, this, () => {basicBody})";
+    }
+      
+    var functionName = $"{typeof(LazyInitializer).FullName}.{nameof(LazyInitializer.EnsureInitialized)}";
+    return $"{functionName}(ref {FieldName}, () => {basicBody})";
+
   }
 
   private string GetMethodInvocation(IMethodSymbol method) {
