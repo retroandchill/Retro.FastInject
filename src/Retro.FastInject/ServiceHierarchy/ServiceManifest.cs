@@ -8,87 +8,16 @@ using Retro.FastInject.Utils;
 namespace Retro.FastInject.ServiceHierarchy;
 
 /// <summary>
-/// Records a service resolution for a constructor parameter.
+/// Represents a manifest for managing service registrations, dependencies, and resolutions.
+/// Provides functionalities to track and retrieve services based on different parameters such as
+/// lifetime, associated keys, and constructor dependencies.
 /// </summary>
-public class ParameterResolution
-{
-    /// <summary>
-    /// The parameter symbol
-    /// </summary>
-    public IParameterSymbol Parameter { get; set; } = null!;
-    
-    /// <summary>
-    /// The type being injected
-    /// </summary>
-    public ITypeSymbol ParameterType { get; set; } = null!;
-    
-    /// <summary>
-    /// Key used for resolution, null for non-keyed services
-    /// </summary>
-    public string? Key { get; set; }
-    
-    /// <summary>
-    /// The service registration that was selected for this parameter
-    /// </summary>
-    public ServiceRegistration? SelectedService { get; set; }
-    
-    /// <summary>
-    /// Whether the parameter was resolved through an indirect service
-    /// </summary>
-    public bool IsIndirectResolution { get; set; }
-    
-    /// <summary>
-    /// The indirect implementation type if IsIndirectResolution is true
-    /// </summary>
-    public ITypeSymbol? IndirectImplementationType { get; set; }
-}
-
-/// <summary>
-/// Records all service resolutions for a constructor.
-/// </summary>
-public class ConstructorResolution
-{
-    /// <summary>
-    /// The constructor that was resolved
-    /// </summary>
-    public IMethodSymbol Constructor { get; set; } = null!;
-    
-    /// <summary>
-    /// The type the constructor belongs to
-    /// </summary>
-    public ITypeSymbol Type { get; set; } = null!;
-    
-    /// <summary>
-    /// All parameter resolutions for this constructor
-    /// </summary>
-    public List<ParameterResolution> Parameters { get; } = [];
-}
-
 public class ServiceManifest {
   
+  private readonly Dictionary<ITypeSymbol, List<ServiceRegistration>> _services = new(TypeSymbolEqualityComparer.Instance);
+  private readonly Dictionary<ITypeSymbol, ITypeSymbol> _indirectServices = new(TypeSymbolEqualityComparer.Instance);
+  private readonly Dictionary<ITypeSymbol, ConstructorResolution> _constructorResolutions = new(TypeSymbolEqualityComparer.Instance);
 
-  private readonly Dictionary<ITypeSymbol, List<ServiceRegistration>> _services;
-  private readonly Dictionary<ITypeSymbol, ITypeSymbol> _indirectServices;
-  private readonly HashSet<ITypeSymbol> _baseTypes;
-  private readonly Dictionary<ITypeSymbol, ConstructorResolution> _constructorResolutions;
-
-  public ServiceManifest() {
-    _services = new Dictionary<ITypeSymbol, List<ServiceRegistration>>(TypeSymbolEqualityComparer.Instance);
-    _indirectServices = new Dictionary<ITypeSymbol, ITypeSymbol>(TypeSymbolEqualityComparer.Instance);
-    _baseTypes = new HashSet<ITypeSymbol>(TypeSymbolEqualityComparer.Instance);
-    _constructorResolutions = new Dictionary<ITypeSymbol, ConstructorResolution>(TypeSymbolEqualityComparer.Instance);
-  }
-  
-  /// <summary>
-  /// Gets the constructor resolution information for a given type.
-  /// </summary>
-  /// <param name="type">The type to get constructor resolution for.</param>
-  /// <returns>Constructor resolution information or null if not available.</returns>
-  public ConstructorResolution? GetConstructorResolution(ITypeSymbol type)
-  {
-      return _constructorResolutions.TryGetValue(type, out var resolution) ? resolution : null;
-  }
-  
   /// <summary>
   /// Gets all constructor resolutions that have been recorded.
   /// </summary>
@@ -96,28 +25,29 @@ public class ServiceManifest {
   {
       return _constructorResolutions.Values;
   }
-  
+
   /// <summary>
-  /// Checks if all dependencies in the constructor can be resolved and records the resolution.
+  /// Checks if all dependencies in the constructor of the specified service registration can be resolved and records the resolution.
   /// </summary>
-  /// <param name="type">The type to check constructors for</param>
-  /// <exception cref="InvalidOperationException">Thrown when dependencies cannot be resolved or multiple public constructors exist</exception>
-  public void CheckConstructorDependencies(ITypeSymbol type) {
-    if (type is not INamedTypeSymbol namedTypeSymbol) return;
-    
-    var publicConstructors = namedTypeSymbol.Constructors
-      .Where(c => c.DeclaredAccessibility == Accessibility.Public)
-      .ToArray();
-    
-    switch (publicConstructors.Length) {
-      case 0:
-        return;
-      case > 1:
-        throw new InvalidOperationException(
-            $"Type '{type.ToDisplayString()}' has multiple public constructors. Only one public constructor is allowed for dependency injection.");
+  /// <param name="declaration">The service registration representing the type and its associated symbol to check.</param>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown when dependencies cannot be resolved, or when the type has multiple public constructors, or if the type is not a named type.
+  /// </exception>
+  public void CheckConstructorDependencies(ServiceRegistration declaration) {
+    var type = declaration.Type;
+    if (type is not INamedTypeSymbol namedTypeSymbol) {
+      throw new InvalidOperationException($"Type '{type.ToDisplayString()}' is not a named type.");
     }
 
-    var constructor = publicConstructors[0];
+    var constructor = declaration.AssociatedSymbol switch {
+        IMethodSymbol method => ValidateFactoryMethod(method),
+        null => GetValidConstructor(namedTypeSymbol),
+        _ => null
+    };
+    if (constructor is null) {
+      return;
+    }
+    
     var missingDependencies = new List<string>();
     
     // Create constructor resolution record
@@ -182,15 +112,14 @@ public class ServiceManifest {
       
       parameterResolution.SelectedService = selectedService;
       constructorResolution.Parameters.Add(parameterResolution);
-      
-      if (!canResolve) {
-        // Add the missing dependency to the list with detailed information
-        string dependency = $"{paramType.ToDisplayString()}";
-        if (keyName != null) {
-          dependency += $" with key '{keyName}'";
-        }
-        missingDependencies.Add(dependency);
+
+      if (canResolve) continue;
+      // Add the missing dependency to the list with detailed information
+      var dependency = $"{paramType.ToDisplayString()}";
+      if (keyName != null) {
+        dependency += $" with key '{keyName}'";
       }
+      missingDependencies.Add(dependency);
     }
     
     // Store the constructor resolution
@@ -203,7 +132,36 @@ public class ServiceManifest {
     }
   }
 
-  public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null, string? key = null) {
+  private static IMethodSymbol? GetValidConstructor(INamedTypeSymbol type) {
+    var publicConstructors = type.Constructors
+        .Where(c => c.DeclaredAccessibility == Accessibility.Public)
+        .ToArray();
+
+    return publicConstructors.Length switch {
+        0 => null,
+        > 1 => throw new InvalidOperationException(
+            $"Type '{type.ToDisplayString()}' has multiple public constructors. Only one public constructor is allowed for dependency injection."),
+        _ => publicConstructors[0]
+    };
+  }
+
+  private static IMethodSymbol ValidateFactoryMethod(IMethodSymbol methodSymbol) {
+    if (methodSymbol.ReturnsVoid || methodSymbol.ReturnType is not INamedTypeSymbol) {
+      throw new InvalidOperationException($"Factory method '{methodSymbol.ToDisplayString()}' must return a named non-void type.");
+    }
+    
+    return methodSymbol;
+  }
+
+  /// <summary>
+  /// Adds a service to the service manifest.
+  /// </summary>
+  /// <param name="serviceType">The type of the service to be added.</param>
+  /// <param name="lifetime">The lifetime scope of the service.</param>
+  /// <param name="implementationType">The implementation type of the service. Defaults to null if the implementation type is the same as the service type.</param>
+  /// <param name="associatedSymbol">An optional symbol associated with the service.</param>
+  /// <param name="key">An optional key to differentiate services of the same type.</param>
+  public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null, ISymbol? associatedSymbol = null, string? key = null) {
     if (!_services.TryGetValue(serviceType, out var registrations)) {
       registrations = [];
       _services[serviceType] = registrations;
@@ -214,45 +172,62 @@ public class ServiceManifest {
         Key = key,
         Lifetime = lifetime,
         ImplementationType = implementationType is null || implementationType.Equals(serviceType, SymbolEqualityComparer.Default) ? null : implementationType,
-        IndexForType = registrations.Count
+        IndexForType = registrations.Count,
+        AssociatedSymbol = associatedSymbol
     });
   }
 
+  /// <summary>
+  /// Adds an indirect service relationship between a service type and its implementation type.
+  /// </summary>
+  /// <param name="serviceType">The service type being registered.</param>
+  /// <param name="implementationType">The implementation type associated with the service type.</param>
   public void AddIndirectService(ITypeSymbol serviceType, ITypeSymbol implementationType) {
     _indirectServices[serviceType] = implementationType;
   }
 
+  /// <summary>
+  /// Attempts to retrieve the implementation type for an indirect service registration.
+  /// </summary>
+  /// <param name="serviceType">The type of the service for which to retrieve the implementation type.</param>
+  /// <param name="implementationType">When this method returns, contains the implementation type associated with the service type, if found; otherwise, null.</param>
+  /// <returns>True if the implementation type was found; otherwise, false.</returns>
   public bool TryGetIndirectService(ITypeSymbol serviceType, out ITypeSymbol? implementationType) {
     return _indirectServices.TryGetValue(serviceType, out implementationType);
   }
 
-  public void AddBaseType(ITypeSymbol baseType) {
-    _baseTypes.Add(baseType);
-  }
-
-  public IEnumerable<ITypeSymbol> GetTypesWithMultipleResolutions() {
-    return _services.Where(kvp => kvp.Value.Count > 1).Select(kvp => kvp.Key);
-  }
-
+  /// <summary>
+  /// Retrieves all service registrations that have an associated key.
+  /// </summary>
+  /// <returns>
+  /// An enumerable collection of service registrations where a key is specified.
+  /// </returns>
   public IEnumerable<ServiceRegistration> GetKeyedServices() {
     return _services.Values
         .SelectMany(list => list)
         .Where(reg => reg.Key != null);
   }
 
+  /// <summary>
+  /// Retrieves all service registrations that do not have a specified key.
+  /// </summary>
+  /// <returns>
+  /// An enumerable collection of unnamed service registrations.
+  /// </returns>
   public IEnumerable<ServiceRegistration> GetUnnamedServices() {
     return _services.Values
         .SelectMany(list => list)
         .Where(reg => reg.Key == null);
   }
 
+  /// <summary>
+  /// Retrieves all service registrations that match the specified service lifetime.
+  /// </summary>
+  /// <param name="lifetime">The desired service lifetime for filtering the service registrations.</param>
+  /// <returns>An enumerable collection of service registrations matching the specified lifetime.</returns>
   public IEnumerable<ServiceRegistration> GetServicesByLifetime(ServiceScope lifetime) {
     return _services.Values
         .SelectMany(list => list)
         .Where(reg => reg.Lifetime == lifetime);
-  }
-
-  public IEnumerable<ITypeSymbol> GetBaseTypes() {
-    return _baseTypes;
   }
 }

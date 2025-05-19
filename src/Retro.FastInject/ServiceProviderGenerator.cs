@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using HandlebarsDotNet;
 using Microsoft.CodeAnalysis;
@@ -10,8 +8,17 @@ using Retro.FastInject.ServiceHierarchy;
 using Retro.FastInject.Utils;
 namespace Retro.FastInject;
 
+/// <summary>
+/// Generates code for classes marked with the [ServiceProvider] attribute.
+/// </summary>
+/// <remarks>
+/// The <see cref="ServiceProviderGenerator"/> is a Roslyn incremental generator
+/// that identifies classes decorated with the <c>[ServiceProvider]</c> attribute
+/// and generates corresponding provider-specific source code during compilation.
+/// </remarks>
 [Generator]
 public class ServiceProviderGenerator : IIncrementalGenerator {
+  /// <inheritdoc />
   public void Initialize(IncrementalGeneratorInitializationContext context) {
     // Get all class declarations with [ServiceProvider] attribute
     var serviceProviderClasses = context.SyntaxProvider
@@ -49,7 +56,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     // Validate constructor dependencies for all service implementations
     foreach (var service in manifest.GetUnnamedServices().Concat(manifest.GetKeyedServices())) {
       try {
-        manifest.CheckConstructorDependencies(service.ImplementationType ?? service.Type);
+        manifest.CheckConstructorDependencies(service);
       } catch (InvalidOperationException ex) {
         context.ReportDiagnostic(Diagnostic.Create(
           new DiagnosticDescriptor(
@@ -92,11 +99,10 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
             })
             .ToList(),
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
-            .Where(x => x.ImplementationType is null)
+            .Where(x => x.ImplementationType is null && x.AssociatedSymbol is not IFieldSymbol and not IPropertySymbol)
             .Select(x => new {
                 Type = x.Type.ToDisplayString(),
-                Name = x.FieldName,
-                Parameters = constructorResolutions.TryGetValue(x.Type, out var parameters) ? parameters : ""
+                Name = x.FieldName
             }),
         Scoped = manifest.GetServicesByLifetime(ServiceScope.Scoped)
             .Where(x => x.ImplementationType is null)

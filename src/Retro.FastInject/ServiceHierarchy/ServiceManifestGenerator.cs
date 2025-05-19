@@ -37,7 +37,8 @@ public static class ServiceManifestGenerator {
             serviceType: serviceType,
             implementationType: implementation.Type,
             lifetime: implementation.Lifetime,
-            key: implementation.Key
+            key: implementation.Key,
+            associatedSymbol: implementation.AssociatedSymbol
         );
       }
 

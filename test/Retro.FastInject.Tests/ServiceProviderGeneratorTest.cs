@@ -105,6 +105,8 @@ public class ServiceProviderGeneratorTests {
                               [Singleton<KeyedService>(Key = "secondary")]
                               public partial class TestServiceProvider
                               {
+                                [Instance]
+                                public int Value { get; } = 1;
                               }
                           }
                           """;

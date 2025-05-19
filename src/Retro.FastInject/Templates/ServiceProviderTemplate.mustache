@@ -49,13 +49,13 @@ partial class {{ClassName}} : IServiceProvider,
     return ((IServiceProvider<{{OtherType}}>) this).GetService();  
     {{/FromOtherService}}
     {{#IsSingleton}}
-    return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}());
+    return {{InitializingStatement}}; 
     {{/IsSingleton}}
     {{#IsScoped}}
     return ((IServiceProvider<{{ServiceType}}>) GetRootScope()).GetService();    
     {{/IsScoped}}
     {{#IsTransient}}
-    return new {{ServiceType}}();    
+    return {{InitializingStatement}}; 
     {{/IsTransient}}
   }  
   {{/RegularServices}}
@@ -92,13 +92,13 @@ partial class {{ClassName}} : IServiceProvider,
         return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);    
         {{/FromOtherService}}
         {{#IsSingleton}}
-        return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}({{Parameters}}));
+        return {{InitializingStatement}};   
         {{/IsSingleton}}
         {{#IsScoped}}
         return ((IKeyedServiceProvider<{{ServiceType}}>) GetRootScope()).GetKeyedService(serviceKey);    
         {{/IsScoped}}
         {{#IsTransient}}
-        return new {{ServiceType}}({{Parameters}});    
+        return {{InitializingStatement}};   
         {{/IsTransient}}
       }
       {{/Options}}
@@ -190,10 +190,10 @@ partial class {{ClassName}} : IServiceProvider,
       return ((IServiceProvider<{{ServiceType}}>) _root).GetService();  
       {{/IsSingleton}}
       {{#IsScoped}}
-      return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}({{Parameters}}));
+      return {{InitializingStatement}};
       {{/IsScoped}}
       {{#IsTransient}}
-      return new {{ServiceType}}({{Parameters}});    
+      return ((IServiceProvider<{{ServiceType}}>) _root).GetService();    
       {{/IsTransient}}
     }  
     {{/RegularServices}}
@@ -233,10 +233,10 @@ partial class {{ClassName}} : IServiceProvider,
           return ((IKeyedServiceProvider<{{ServiceType}}>) _root).GetKeyedService(serviceKey); 
           {{/IsSingleton}}
           {{#IsScoped}}
-          return LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => new {{ServiceType}}({{Parameters}}));
+          return {{InitializingStatement}}; 
           {{/IsScoped}}
           {{#IsTransient}}
-          return new {{ServiceType}}({{Parameters}});    
+          return ((IServiceProvider<{{ServiceType}}>) _root).GetService();    
           {{/IsTransient}}
         }
         {{/Options}}
