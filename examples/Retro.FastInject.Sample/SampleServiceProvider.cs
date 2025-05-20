@@ -9,7 +9,7 @@ namespace Retro.FastInject.Sample;
 [Scoped<ScopedService>]
 [Transient<TransientService>]
 [Singleton<ValueService>]
-public partial class SampleServiceProvider(int value, float simpleValue) {
+public sealed partial class SampleServiceProvider(int value, float simpleValue) {
 
   [Instance]
   private float SimpleValue { get; } = simpleValue;

@@ -2,10 +2,12 @@
 using System.Linq;
 using HandlebarsDotNet;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.ServiceHierarchy;
 using Retro.FastInject.Utils;
+
 namespace Retro.FastInject;
 
 /// <summary>
@@ -26,7 +28,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
             predicate: static (s, _) => s is ClassDeclarationSyntax { AttributeLists.Count: > 0 },
             transform: static (ctx, _) => {
               var classNode = (ClassDeclarationSyntax)ctx.Node;
-              var symbol = ctx.SemanticModel.GetDeclaredSymbol(classNode);
+              var symbol = ModelExtensions.GetDeclaredSymbol(ctx.SemanticModel, classNode);
 
               if (symbol == null) return null;
 
@@ -51,6 +53,23 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
   }
 
   private static void Execute(Compilation compilation, INamedTypeSymbol classSymbol, SourceProductionContext context) {
+    if (!classSymbol.DeclaringSyntaxReferences
+            .Any(x => x.GetSyntax() is ClassDeclarationSyntax classDeclaration
+                      && classDeclaration.Modifiers.Any(y => y.IsKind(SyntaxKind.PartialKeyword)))) {
+      context.ReportDiagnostic(
+          Diagnostic.Create(new DiagnosticDescriptor(
+                                "FastInject001",
+                                "Dependency Injection Error",
+                                $"Class {classSymbol.Name} must be declared partial",
+                                "DependencyInjection",
+                                DiagnosticSeverity.Error,
+                                true
+                            ),
+                            classSymbol.Locations.FirstOrDefault()
+          ));
+      return;
+    }
+
     var manifest = classSymbol.GenerateManifest();
 
     // Validate constructor dependencies for all service implementations
@@ -59,35 +78,38 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         manifest.CheckConstructorDependencies(service);
       } catch (InvalidOperationException ex) {
         context.ReportDiagnostic(Diagnostic.Create(
-          new DiagnosticDescriptor(
-            "FastInject001",
-            "Dependency Injection Error",
-            ex.Message,
-            "DependencyInjection",
-            DiagnosticSeverity.Error,
-            true
-          ),
-          classSymbol.Locations.FirstOrDefault()
-        ));
+                                     new DiagnosticDescriptor(
+                                         "FastInject002",
+                                         "Dependency Injection Error",
+                                         ex.Message,
+                                         "DependencyInjection",
+                                         DiagnosticSeverity.Error,
+                                         true
+                                     ),
+                                     classSymbol.Locations.FirstOrDefault()
+                                 ));
       }
     }
-  
+
     // Prepare constructor resolution information for template
     var constructorResolutions = manifest.GetAllConstructorResolutions()
         .Select(cr => new {
             cr.Type,
             Parameters = cr.Parameters.Select(p => {
               var type = p.ParameterType.ToDisplayString();
-              return p.Key is not null ? $"((IKeyedServiceProvider<{type}>) this).GetKeyedService({p.Key})" : $"((IServiceProvider<{type}>) this).GetService()";
+              return p.Key is not null
+                  ? $"((IKeyedServiceProvider<{type}>) this).GetKeyedService({p.Key})"
+                  : $"((IServiceProvider<{type}>) this).GetService()";
             }).Joining(", ")
         })
         .ToDictionary(x => x.Type, x => x.Parameters, TypeSymbolEqualityComparer.Instance);
-  
+
     var templateParams = new {
         Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
         ClassName = classSymbol.Name,
         RegularServices = manifest.GetUnnamedServices()
-            .Select(x => new ServiceInjection(x, constructorResolutions.TryGetValue(x.Type, out var parameters) ? parameters : ""))
+            .Select(x => new ServiceInjection(
+                        x, constructorResolutions.TryGetValue(x.Type, out var parameters) ? parameters : ""))
             .ToList(),
         KeyedServices = manifest.GetKeyedServices()
             .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
@@ -95,7 +117,10 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                 ServiceType = x.Key.ToDisplayString(),
                 FromOtherService = manifest.TryGetIndirectService(x.Key, out var implementationType),
                 OtherType = implementationType?.ToDisplayString(),
-                Options = x.Select(y => new ServiceInjection(y, constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : "")).ToList()
+                Options = x.Select(y => new ServiceInjection(
+                                       y,
+                                       constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : ""))
+                    .ToList()
             })
             .ToList(),
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
@@ -113,46 +138,41 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                 Name = x.FieldName,
                 x.IsDisposable,
                 x.IsAsyncDisposable
-                
             }),
     };
 
     var handlebars = Handlebars.Create();
     handlebars.Configuration.TextEncoder = null;
-    
+
     // Register partial templates
     handlebars.RegisterTemplate("DisposableManagement", SourceTemplates.DisposableManagementTemplate);
     handlebars.RegisterTemplate("ServiceResolution", SourceTemplates.ServiceResolutionTemplate);
     handlebars.RegisterTemplate("ServiceTypeResolution", SourceTemplates.ServiceTypeResolutionTemplate);
     handlebars.RegisterTemplate("KeyedServiceSwitch", SourceTemplates.KeyedServiceSwitchTemplate);
-    
+
     handlebars.RegisterHelper("withIndent", (writer, options, ctx, parameters) => {
       var indent = parameters[0] as string ?? "";
-    
+
       // Capture the block content
       var content = options.Template();
-    
+
       // Split the content into lines
       var lines = content.ToString().Split('\n');
-    
+
       // Add indentation to each line except empty lines
-      var indentedLines = lines.Select(line => 
+      var indentedLines = lines.Select(line =>
                                            string.IsNullOrWhiteSpace(line) ? line : indent + line);
-    
+
       // Join the lines back together
       writer.WriteSafeString(string.Join("\n", indentedLines));
     });
 
 
-    
     var template = handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
-    
+
     var templateResult = template(templateParams);
     context.AddSource("ServiceProvider.g.cs", templateResult);
-    
+
     Console.WriteLine(manifest.ToString());
   }
-
-  
-
 }
