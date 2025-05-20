@@ -1,5 +1,8 @@
-﻿using System.Linq;
+﻿using System;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
 using Retro.FastInject.Annotations;
@@ -8,125 +11,172 @@ using static Retro.FastInject.Tests.Utils.GeneratorTestHelpers;
 namespace Retro.FastInject.Tests;
 
 public class ServiceProviderGeneratorTests {
-
-  [Test]
-  public async Task Generator_WithBasicServiceProvider_ShouldFindServiceProviderAttribute() {
-    // Arrange
-    const string source = """
-
-                          using Retro.FastInject.Annotations;
-
-                          namespace TestNamespace
-                          {
-                              [ServiceProvider]
-                              public partial class TestServiceProvider
-                              {
+    [Test]
+    public async Task Generator_WithoutPartialKeyword_ShouldReportError() {
+        // Arrange
+        const string source = """
+                              using Retro.FastInject.Annotations;
+                              namespace TestNamespace {
+                                  [ServiceProvider]
+                                  public class TestServiceProvider {}
                               }
-                          }
-                          """;
+                              """;
 
-    var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
+        // Act
+        var (diagnostics, _) = await RunGenerator(source);
 
-    // Act
-    var driver = CSharpGeneratorDriver.Create(new ServiceProviderGenerator());
-    driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
-
-    // Assert - Add breakpoint here to inspect the process
-    Assert.That(diagnostics, Is.Empty);
-    var generatedTrees = outputCompilation.SyntaxTrees.Except(compilation.SyntaxTrees).ToList();
-    TestContext.WriteLine("Generated files count: " + generatedTrees.Count);
-    foreach (var tree in generatedTrees) {
-      TestContext.WriteLine("Generated file content:");
-      TestContext.WriteLine(tree.ToString());
+        // Assert
+        Assert.That(diagnostics, Has.Exactly(1).Items);
+        var diagnostic = diagnostics.Single();
+        Assert.Multiple(() => {
+            Assert.That(diagnostic.Id, Is.EqualTo("FastInject001"));
+            Assert.That(diagnostic.GetMessage(), Contains.Substring("must be declared partial"));
+        });
     }
-  }
 
-  [Test]
-  public async Task Generator_WithDependencyAttributes_ShouldProcessAllDependencies() {
-    // Arrange
-    const string source = """
-
-                          using System;
-                          using Retro.FastInject.Annotations;
-
-                          namespace TestNamespace
-                          {
-                              public interface ITestService {}
-                              public class TestService : ITestService {}
-                              public interface IScopedService {}
-                              public class ScopedService : IScopedService {}
-                              public interface ITransientService {}
-                              public class TransientService : ITransientService, IDisposable, IAsyncDisposable {
-                                public void Dispose() {
-                                }
-                                
-                                public ValueTask DisposeAsync() {
-                                  return default;
-                                }
+    [Test]
+    public async Task Generator_WithMissingDependency_ShouldReportError() {
+        // Arrange
+        const string source = """
+                              using Retro.FastInject.Annotations;
+                              namespace TestNamespace {
+                                  public interface IService {
+                                      void DoSomething(IMissingDependency dep);
+                                  }
+                                  public class Service : IService {
+                                      public Service(IMissingDependency dep) {}
+                                      public void DoSomething(IMissingDependency dep) {}
+                                  }
+                                  [ServiceProvider]
+                                  [Singleton<Service>]
+                                  public partial class TestServiceProvider {}
                               }
+                              """;
 
-                              [ServiceProvider]
-                              [Singleton<TestService>]
-                              [Scoped<ScopedService>]
-                              [Transient<TransientService>]
-                              public partial class TestServiceProvider
-                              {
-                              }
-                          }
-                          """;
+        // Act
+        var (diagnostics, _) = await RunGenerator(source);
 
-    var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
-
-    // Act
-    var driver = CSharpGeneratorDriver.Create(new ServiceProviderGenerator());
-    driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
-
-    // Assert - Add breakpoint here to inspect the process
-    Assert.That(diagnostics, Is.Empty);
-    var generatedTrees = outputCompilation.SyntaxTrees.Except(compilation.SyntaxTrees).ToList();
-    TestContext.WriteLine("Generated files count: " + generatedTrees.Count);
-    foreach (var tree in generatedTrees) {
-      TestContext.WriteLine("Generated file content:");
-      TestContext.WriteLine(tree.ToString());
+        // Assert
+        Assert.That(diagnostics, Has.Exactly(1).Items);
+        var diagnostic = diagnostics.Single();
+        Assert.Multiple(() => {
+            Assert.That(diagnostic.Id, Is.EqualTo("FastInject002"));
+            Assert.That(diagnostic.GetMessage(), Contains.Substring("dependencies"));
+        });
     }
-  }
 
-  [Test]
-  public async Task Generator_WithKeyedServices_ShouldProcessKeyedDependencies() {
-    // Arrange
-    const string source = """
-
-                          using Retro.FastInject.Annotations;
-
-                          namespace TestNamespace
-                          {
-                              public interface IKeyed {}
-                              public class KeyedService : IKeyed {}
-
-                              [ServiceProvider]
-                              [Singleton<KeyedService>(Key = "primary")]
-                              [Singleton<KeyedService>(Key = "secondary")]
-                              public partial class TestServiceProvider
-                              {
-                                [Instance]
-                                public int Value { get; } = 1;
+    [Test]
+    public async Task Generator_WithValidServiceProvider_ShouldGenerateCode() {
+        // Arrange
+        const string source = """
+                              using Retro.FastInject.Annotations;
+                              namespace TestNamespace {
+                                  [ServiceProvider]
+                                  public partial class TestServiceProvider {}
                               }
-                          }
-                          """;
+                              """;
 
-    var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
+        // Act
+        var (diagnostics, output) = await RunGenerator(source);
 
-    // Act
-    var driver = CSharpGeneratorDriver.Create(new ServiceProviderGenerator());
-    driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
-
-    // Assert - Add breakpoint here to inspect the process
-    Assert.That(diagnostics, Is.Empty);
-    var generatedTrees = outputCompilation.SyntaxTrees.Except(compilation.SyntaxTrees).ToList();
-    TestContext.WriteLine("Generated files count: " + generatedTrees.Count);
-    foreach (var tree in generatedTrees) {
-      TestContext.WriteLine("Generated file content:");
-      TestContext.WriteLine(tree.ToString());
+        // Assert
+        Assert.Multiple(() => {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+        });
     }
-  }
+
+    [Test]
+    public async Task Generator_WithComplexDependencies_ShouldGenerateValidCode() {
+        // Arrange
+        const string source = """
+                              using System;
+                              using Retro.FastInject.Annotations;
+                              namespace TestNamespace {
+                                  public interface IService {}
+                                  public class Service : IService {
+                                      public Service(ILogger logger) {}
+                                  }
+                                  public interface ILogger {}
+                                  public class Logger : ILogger {}
+                                  
+                                  [ServiceProvider]
+                                  [Singleton<Service>]
+                                  [Singleton<Logger>]
+                                  public partial class TestServiceProvider {}
+                              }
+                              """;
+
+        // Act
+        var (diagnostics, output) = await RunGenerator(source);
+
+        // Assert
+        Assert.Multiple(() => {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+        });
+    }
+
+    [Test]
+    public async Task Generator_WithKeyedServices_ShouldGenerateValidCode() {
+        // Arrange
+        const string source = """
+                              using Retro.FastInject.Annotations;
+                              namespace TestNamespace {
+                                  public interface IService {}
+                                  public class ServiceA : IService {}
+                                  public class ServiceB : IService {}
+                                  
+                                  [ServiceProvider]
+                                  [Singleton<ServiceA>(Key = "A")]
+                                  [Singleton<ServiceB>(Key = "B")]
+                                  public partial class TestServiceProvider {}
+                              }
+                              """;
+
+        // Act
+        var (diagnostics, output) = await RunGenerator(source);
+
+        // Assert
+        Assert.Multiple(() => {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+        });
+    }
+
+    [Test]
+    public async Task Generator_WithDisposableServices_ShouldGenerateDisposalCode() {
+        // Arrange
+        const string source = """
+                              using System;
+                              using Retro.FastInject.Annotations;
+                              namespace TestNamespace {
+                                  public interface IService : IDisposable {}
+                                  public class Service : IService {
+                                      public void Dispose() {}
+                                  }
+                                  
+                                  [ServiceProvider]
+                                  [Singleton<Service>]
+                                  public partial class TestServiceProvider {}
+                              }
+                              """;
+
+        // Act
+        var (diagnostics, output) = await RunGenerator(source);
+
+        // Assert
+        Assert.Multiple(() => {
+            Assert.That(diagnostics, Is.Empty);
+            Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+        });
+    }
+
+    private static Task<(ImmutableArray<Diagnostic> Diagnostics, Compilation Output)> RunGenerator(string source) {
+        var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
+        var generator = new ServiceProviderGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
+        return Task.FromResult((diagnostics, outputCompilation));
+    }
 }
