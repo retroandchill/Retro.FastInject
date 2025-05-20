@@ -8,7 +8,6 @@ namespace Retro.FastInject.Utils;
 /// Provides extension methods for handling attributes in .NET code analysis.
 /// </summary>
 public static class AttributeExtensions {
-
   /// <summary>
   /// Determines whether the specified attribute is of the given attribute type.
   /// </summary>
@@ -33,5 +32,4 @@ public static class AttributeExtensions {
     return symbol.GetAttributes()
         .FirstOrDefault(a => a.IsOfAttributeType<T>());
   }
-
 }

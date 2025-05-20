@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Microsoft.CodeAnalysis;
+
 namespace Retro.FastInject.ServiceHierarchy;
 
 /// <summary>

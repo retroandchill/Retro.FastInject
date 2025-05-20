@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Utils;
+
 namespace Retro.FastInject.ServiceHierarchy;
 
 /// <summary>
@@ -13,17 +14,19 @@ namespace Retro.FastInject.ServiceHierarchy;
 /// lifetime, associated keys, and constructor dependencies.
 /// </summary>
 public class ServiceManifest {
-  
-  private readonly Dictionary<ITypeSymbol, List<ServiceRegistration>> _services = new(TypeSymbolEqualityComparer.Instance);
+  private readonly Dictionary<ITypeSymbol, List<ServiceRegistration>> _services =
+      new(TypeSymbolEqualityComparer.Instance);
+
   private readonly Dictionary<ITypeSymbol, ITypeSymbol> _indirectServices = new(TypeSymbolEqualityComparer.Instance);
-  private readonly Dictionary<ITypeSymbol, ConstructorResolution> _constructorResolutions = new(TypeSymbolEqualityComparer.Instance);
+
+  private readonly Dictionary<ITypeSymbol, ConstructorResolution> _constructorResolutions =
+      new(TypeSymbolEqualityComparer.Instance);
 
   /// <summary>
   /// Gets all constructor resolutions that have been recorded.
   /// </summary>
-  public IEnumerable<ConstructorResolution> GetAllConstructorResolutions()
-  {
-      return _constructorResolutions.Values;
+  public IEnumerable<ConstructorResolution> GetAllConstructorResolutions() {
+    return _constructorResolutions.Values;
   }
 
   /// <summary>
@@ -47,69 +50,66 @@ public class ServiceManifest {
     if (constructor is null) {
       return;
     }
-    
+
     var missingDependencies = new List<string>();
-    
+
     // Create constructor resolution record
-    var constructorResolution = new ConstructorResolution
-    {
+    var constructorResolution = new ConstructorResolution {
         Constructor = constructor,
         Type = type
     };
-    
+
     foreach (var parameter in constructor.Parameters) {
       var paramType = parameter.Type;
-      
+
       // Create parameter resolution
-      var parameterResolution = new ParameterResolution
-      {
+      var parameterResolution = new ParameterResolution {
           Parameter = parameter,
           ParameterType = paramType
       };
-      
+
       // Check for FromKeyedServices attribute
       var fromKeyedServicesAttr = parameter.GetAttributes()
-        .FirstOrDefault(a => a.IsOfAttributeType<FromKeyedServicesAttribute>());
-      
+          .FirstOrDefault(a => a.IsOfAttributeType<FromKeyedServicesAttribute>());
+
       string? keyName = null;
       if (fromKeyedServicesAttr is {
               ConstructorArguments.Length: > 0
           }) {
         keyName = fromKeyedServicesAttr.ConstructorArguments[0].Value?.ToString();
       }
-      
+
       parameterResolution.Key = keyName;
-      
+
       // Check if the dependency can be resolved
       var canResolve = false;
       ServiceRegistration? selectedService = null;
-      
+
       if (keyName != null) {
         // For keyed service, look for service with matching key
         if (_services.TryGetValue(paramType, out var registrations)) {
           selectedService = registrations.FirstOrDefault(r => r.Key == keyName);
           canResolve = selectedService != null;
         }
-      } 
-      else {
+      } else {
         // For regular service, only look for non-keyed registrations
         if (_services.TryGetValue(paramType, out var registrations)) {
           selectedService = registrations.FirstOrDefault(r => r.Key == null);
           canResolve = selectedService != null;
         }
-        
+
         // If we can't resolve directly, check indirect services
         if (!canResolve && _indirectServices.TryGetValue(paramType, out var implementationType)) {
           parameterResolution.IsIndirectResolution = true;
           parameterResolution.IndirectImplementationType = implementationType;
-          
+
           if (_services.TryGetValue(implementationType, out var implRegistrations)) {
             selectedService = implRegistrations.FirstOrDefault(r => r.Key == null);
             canResolve = selectedService != null;
           }
         }
       }
-      
+
       parameterResolution.SelectedService = selectedService;
       constructorResolution.Parameters.Add(parameterResolution);
 
@@ -119,16 +119,17 @@ public class ServiceManifest {
       if (keyName != null) {
         dependency += $" with key '{keyName}'";
       }
+
       missingDependencies.Add(dependency);
     }
-    
+
     // Store the constructor resolution
     _constructorResolutions[type] = constructorResolution;
-    
+
     if (missingDependencies.Count > 0) {
       throw new InvalidOperationException(
-        $"Cannot resolve the following dependencies for type '{type.ToDisplayString()}':\n" +
-        $"- {string.Join("\n- ", missingDependencies)}");
+          $"Cannot resolve the following dependencies for type '{type.ToDisplayString()}':\n" +
+          $"- {string.Join("\n- ", missingDependencies)}");
     }
   }
 
@@ -147,9 +148,10 @@ public class ServiceManifest {
 
   private static IMethodSymbol ValidateFactoryMethod(IMethodSymbol methodSymbol) {
     if (methodSymbol.ReturnsVoid || methodSymbol.ReturnType is not INamedTypeSymbol) {
-      throw new InvalidOperationException($"Factory method '{methodSymbol.ToDisplayString()}' must return a named non-void type.");
+      throw new InvalidOperationException(
+          $"Factory method '{methodSymbol.ToDisplayString()}' must return a named non-void type.");
     }
-    
+
     return methodSymbol;
   }
 
@@ -161,7 +163,8 @@ public class ServiceManifest {
   /// <param name="implementationType">The implementation type of the service. Defaults to null if the implementation type is the same as the service type.</param>
   /// <param name="associatedSymbol">An optional symbol associated with the service.</param>
   /// <param name="key">An optional key to differentiate services of the same type.</param>
-  public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null, ISymbol? associatedSymbol = null, string? key = null) {
+  public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null,
+                         ISymbol? associatedSymbol = null, string? key = null) {
     if (!_services.TryGetValue(serviceType, out var registrations)) {
       registrations = [];
       _services[serviceType] = registrations;
@@ -171,7 +174,10 @@ public class ServiceManifest {
         Type = serviceType,
         Key = key,
         Lifetime = lifetime,
-        ImplementationType = implementationType is null || implementationType.Equals(serviceType, SymbolEqualityComparer.Default) ? null : implementationType,
+        ImplementationType =
+            implementationType is null || implementationType.Equals(serviceType, SymbolEqualityComparer.Default)
+                ? null
+                : implementationType,
         IndexForType = registrations.Count,
         AssociatedSymbol = associatedSymbol,
         IsDisposable = serviceType.AllInterfaces.Any(i => i.IsOfType<IDisposable>()),

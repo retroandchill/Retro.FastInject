@@ -1,6 +1,7 @@
 ﻿using System.Threading;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+
 namespace Retro.FastInject.ServiceHierarchy;
 
 /// <summary>
@@ -109,21 +110,20 @@ public record ServiceRegistration {
     };
 
     if (Lifetime == ServiceScope.Transient || AssociatedSymbol is IPropertySymbol or IFieldSymbol) return basicBody;
-    
+
     if (Type.IsValueType) {
       return $"InitializationUtils.EnsureValueInitialized(ref {FieldName}, this, () => {basicBody})";
     }
-      
+
     var functionName = $"{typeof(LazyInitializer).FullName}.{nameof(LazyInitializer.EnsureInitialized)}";
     return $"{functionName}(ref {FieldName}, () => {basicBody})";
-
   }
 
   private string GetMethodInvocation(IMethodSymbol method, bool scopedTransient) {
     if (method.IsStatic) {
       return method.ToDisplayString();
     }
-    
+
     return Lifetime == ServiceScope.Singleton || scopedTransient ? $"_root.{method.Name}" : method.Name;
   }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+
 namespace Retro.FastInject.ServiceHierarchy;
 
 /// <summary>
@@ -56,7 +57,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// singleton scope, and there is no specified implementation type.
   /// A singleton service is instantiated once and shared for the duration of the application lifecycle.
   /// </remarks>
-  public bool IsSingleton { get; } = registration.ImplementationType is null && registration.Lifetime == ServiceScope.Singleton;
+  public bool IsSingleton { get; } =
+    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Singleton;
 
   /// <summary>
   /// Gets a value indicating whether the service has a scoped lifecycle in the dependency injection container.
@@ -66,7 +68,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// registration and no specific implementation type is associated with it. Scoped services are instantiated once per
   /// request and are shared within the scope of that request.
   /// </remarks>
-  public bool IsScoped { get; } = registration.ImplementationType is null && registration.Lifetime == ServiceScope.Scoped;
+  public bool IsScoped { get; } =
+    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Scoped;
 
   /// <summary>
   /// Indicates whether the service associated with this injection has a transient lifecycle.
@@ -76,7 +79,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// in the associated <see cref="ServiceRegistration"/>. A transient service is created each time it is requested,
   /// providing a new instance on every injection.
   /// </remarks>
-  public bool IsTransient { get; } = registration.ImplementationType is null && registration.Lifetime == ServiceScope.Transient;
+  public bool IsTransient { get; } =
+    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Transient;
 
   /// <summary>
   /// Gets the unique identifier (key) associated with the service registration.
@@ -135,6 +139,6 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// <see cref="ServiceRegistration"/> associated with this injection.
   /// </remarks>
   public bool IsAsyncDisposable { get; } = registration.IsAsyncDisposable;
-  
+
   public bool DoubleDisposable { get; } = registration.IsDisposable && registration.IsAsyncDisposable;
 }

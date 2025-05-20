@@ -9,4 +9,8 @@ namespace Retro.FastInject.ServiceHierarchy;
 /// This encapsulates metadata associated with a specific service type, its lifetime scope,
 /// an optional key for uniquely identifying instances, and potentially an associated symbol.
 /// </summary>
-public record ServiceDeclaration(ITypeSymbol Type, ServiceScope Lifetime, string? Key, ISymbol? AssociatedSymbol = null);
+public record ServiceDeclaration(
+    ITypeSymbol Type,
+    ServiceScope Lifetime,
+    string? Key,
+    ISymbol? AssociatedSymbol = null);

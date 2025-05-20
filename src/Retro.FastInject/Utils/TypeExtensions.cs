@@ -46,7 +46,7 @@ public static class TypeExtensions {
     if (IsProblematicInterface(namedType)) {
       return false;
     }
-    
+
     // Check if the interface has any static members
     var staticMembers = namedType.GetMembers().Where(m => m.IsStatic).ToList();
     if (!staticMembers.Any()) return true;
@@ -111,11 +111,11 @@ public static class TypeExtensions {
 
     return true;
   }
-  
-  
-private static bool IsProblematicInterface(INamedTypeSymbol type) {
+
+
+  private static bool IsProblematicInterface(INamedTypeSymbol type) {
     var fullName = type.ToDisplayString();
-    
+
     // System.Numerics interfaces
     var numericInterfaces = new[] {
         "System.Numerics.INumber<",
@@ -149,7 +149,7 @@ private static bool IsProblematicInterface(INamedTypeSymbol type) {
         "System.ISpanParsable<",
         "System.IParsable<",
         "System.IUtf8SpanParsable<",
-        
+
         // Collections and related
         "System.Collections.Generic.IEnumerable<",
         "System.Collections.Generic.IAsyncEnumerable<",
@@ -161,7 +161,7 @@ private static bool IsProblematicInterface(INamedTypeSymbol type) {
         "System.Collections.Generic.IReadOnlyList<",
         "System.Collections.Generic.IReadOnlySet<",
         "System.Collections.Generic.IReadOnlyDictionary<",
-        
+
         // Additional common interfaces
         "System.IObservable<",
         "System.IObserver<",
@@ -169,11 +169,11 @@ private static bool IsProblematicInterface(INamedTypeSymbol type) {
         "System.IDisposable",
         "System.IAsyncDisposable",
         "System.ICloneable",
-        
+
         // Comparison interfaces
         "System.IComparer<",
         "System.Collections.Generic.IEqualityComparer<",
-        
+
         // Additional numeric interfaces
         "System.IAdditionOperators<",
         "System.ISubtractionOperators<",
@@ -182,7 +182,7 @@ private static bool IsProblematicInterface(INamedTypeSymbol type) {
         "System.IAdditionOperators<",
         "System.IAdditiveIdentity<",
         "System.IMultiplicativeIdentity<",
-        
+
         // Pattern interfaces
         "System.IAsyncPattern",
         "System.IValueTaskSource<",
@@ -191,6 +191,5 @@ private static bool IsProblematicInterface(INamedTypeSymbol type) {
 
     return numericInterfaces.Concat(bclInterfaces)
         .Any(pi => fullName.StartsWith(pi, StringComparison.Ordinal));
-}
-
+  }
 }
