@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace Retro.FastInject.Utils;
@@ -22,23 +23,30 @@ public static class ParameterExtensions {
     }
 
     var value = parameter.ExplicitDefaultValue;
+    
+    // Handle enums
+    if (parameter.Type.TypeKind == TypeKind.Enum) {
+      var enumType = (INamedTypeSymbol)parameter.Type;
+      var enumMembers = enumType.GetMembers().OfType<IFieldSymbol>()
+          .Where(f => f.HasConstantValue);
+        
+      var enumMember = enumMembers.FirstOrDefault(m => 
+                                                      Equals(m.ConstantValue, parameter.ExplicitDefaultValue));
+        
+      return enumMember != null ? $"{parameter.Type.ToDisplayString()}.{enumMember.Name}" :
+          // Fallback to numeric value if no matching member is found
+          $"({parameter.Type.ToDisplayString()}){value}";
+    }
 
-    switch (value) {
-      // Handle null
-      case null:
-        return "null";
-      // Handle strings
-      case string str:
-        return $"\"{str.Replace("\"", "\\\"")}\"";
-      // Handle chars
-      case char c:
-        return $"'{c}'";
-      // Handle boolean
-      case bool b:
-        return b ? "true" : "false";
-      // Handle numeric types
-      case IFormattable:
-        return value switch {
+    return value switch {
+        // Handle strings
+        string str => $"\"{str.Replace("\"", "\\\"")}\"",
+        // Handle chars
+        char c => $"'{c}'",
+        // Handle boolean
+        bool b => b ? "true" : "false",
+        // Handle numeric types
+        IFormattable and not Enum => value switch {
             // Special handling for decimal
             decimal m => $"{m}m",
             // Special handling for float
@@ -48,14 +56,9 @@ public static class ParameterExtensions {
             // Special handling for long
             long l => $"{l}L",
             _ => value.ToString()
-        };
-    }
-
-    // Handle enums
-    if (parameter.Type.TypeKind == TypeKind.Enum)
-      return $"{parameter.Type.ToDisplayString()}.{value}";
-
-    // Handle value types with default
-    return parameter.Type.IsValueType ? $"default({parameter.Type.ToDisplayString()})" : "null";
+        },
+        // Handle value types with default
+        _ => parameter.Type.IsValueType ? $"default({parameter.Type.ToDisplayString()})" : "null"
+    };
   }
 }
