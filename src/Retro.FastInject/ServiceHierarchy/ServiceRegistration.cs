@@ -85,13 +85,13 @@ public record ServiceRegistration {
   /// explicitly implements `IDisposable`. It allows the dependency injection system to
   /// identify services that require disposal and handle them appropriately during the
   /// cleanup process.
-  public required bool IsDisposable { get; init; }
+  public bool IsDisposable { get; init; }
 
   /// Indicates whether the service being registered implements the `System.IAsyncDisposable` interface.
   /// This property is used to determine if the service requires asynchronous disposal during its lifecycle.
   /// It ensures that services implementing `IAsyncDisposable` are properly disposed using an asynchronous
   /// pattern when they go out of scope in the dependency injection framework.
-  public required bool IsAsyncDisposable { get; init; }
+  public bool IsAsyncDisposable { get; init; }
 
   /// <summary>
   /// Generates the initialization statement for the service registration, which includes

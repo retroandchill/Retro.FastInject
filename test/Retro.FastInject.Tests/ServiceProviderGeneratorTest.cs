@@ -1,23 +1,15 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using NUnit.Framework;
 using Retro.FastInject.Annotations;
-using Xunit;
-using Xunit.Abstractions;
 using static Retro.FastInject.Tests.Utils.GeneratorTestHelpers;
-using DependencyAttribute = System.Runtime.CompilerServices.DependencyAttribute;
 
 namespace Retro.FastInject.Tests;
 
 public class ServiceProviderGeneratorTests {
-  private readonly ITestOutputHelper _output;
 
-  public ServiceProviderGeneratorTests(ITestOutputHelper output) {
-    _output = output;
-  }
-
-  [Fact]
+  [Test]
   public async Task Generator_WithBasicServiceProvider_ShouldFindServiceProviderAttribute() {
     // Arrange
     const string source = """
@@ -40,16 +32,16 @@ public class ServiceProviderGeneratorTests {
     driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
     // Assert - Add breakpoint here to inspect the process
-    Assert.Empty(diagnostics);
+    Assert.That(diagnostics, Is.Empty);
     var generatedTrees = outputCompilation.SyntaxTrees.Except(compilation.SyntaxTrees).ToList();
-    _output.WriteLine("Generated files count: " + generatedTrees.Count);
+    TestContext.WriteLine("Generated files count: " + generatedTrees.Count);
     foreach (var tree in generatedTrees) {
-      _output.WriteLine("Generated file content:");
-      _output.WriteLine(tree.ToString());
+      TestContext.WriteLine("Generated file content:");
+      TestContext.WriteLine(tree.ToString());
     }
   }
 
-  [Fact]
+  [Test]
   public async Task Generator_WithDependencyAttributes_ShouldProcessAllDependencies() {
     // Arrange
     const string source = """
@@ -90,16 +82,16 @@ public class ServiceProviderGeneratorTests {
     driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
     // Assert - Add breakpoint here to inspect the process
-    Assert.Empty(diagnostics);
+    Assert.That(diagnostics, Is.Empty);
     var generatedTrees = outputCompilation.SyntaxTrees.Except(compilation.SyntaxTrees).ToList();
-    _output.WriteLine("Generated files count: " + generatedTrees.Count);
+    TestContext.WriteLine("Generated files count: " + generatedTrees.Count);
     foreach (var tree in generatedTrees) {
-      _output.WriteLine("Generated file content:");
-      _output.WriteLine(tree.ToString());
+      TestContext.WriteLine("Generated file content:");
+      TestContext.WriteLine(tree.ToString());
     }
   }
 
-  [Fact]
+  [Test]
   public async Task Generator_WithKeyedServices_ShouldProcessKeyedDependencies() {
     // Arrange
     const string source = """
@@ -129,12 +121,12 @@ public class ServiceProviderGeneratorTests {
     driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
     // Assert - Add breakpoint here to inspect the process
-    Assert.Empty(diagnostics);
+    Assert.That(diagnostics, Is.Empty);
     var generatedTrees = outputCompilation.SyntaxTrees.Except(compilation.SyntaxTrees).ToList();
-    _output.WriteLine("Generated files count: " + generatedTrees.Count);
+    TestContext.WriteLine("Generated files count: " + generatedTrees.Count);
     foreach (var tree in generatedTrees) {
-      _output.WriteLine("Generated file content:");
-      _output.WriteLine(tree.ToString());
+      TestContext.WriteLine("Generated file content:");
+      TestContext.WriteLine(tree.ToString());
     }
   }
 }
