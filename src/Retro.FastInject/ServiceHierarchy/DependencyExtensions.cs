@@ -7,7 +7,19 @@ using Retro.FastInject.Utils;
 
 namespace Retro.FastInject.ServiceHierarchy;
 
-internal static class DependencyExtensions {
+/// <summary>
+/// Provides extension methods for analyzing and retrieving dependency injection service details
+/// from Roslyn `ITypeSymbol` representations of classes or types.
+/// </summary>
+public static class DependencyExtensions {
+  /// <summary>
+  /// Retrieves a collection of services injected into the specified class using attributes,
+  /// factory methods, or instance members. This method analyzes the class for services that
+  /// are declared via attributes, factory methods, or instance-level fields/properties.
+  /// </summary>
+  /// <param name="classSymbol">The class symbol to analyze for injected services.</param>
+  /// <returns>A collection of <see cref="ServiceDeclaration"/> objects representing the
+  /// injected services and their associated metadata.</returns>
   public static IEnumerable<ServiceDeclaration> GetInjectedServices(this ITypeSymbol classSymbol) {
     var alreadyImported = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
@@ -91,7 +103,9 @@ internal static class DependencyExtensions {
     } else if (attribute.IsOfAttributeType<TransientAttribute>()) {
       scope = ServiceScope.Transient;
     } else {
-      scope = attribute.ConstructorArguments[1].Value is ServiceScope s ? s : ServiceScope.Singleton;
+      scope = attribute.ConstructorArguments[1].Value is int s 
+              && Enum.IsDefined(typeof(ServiceScope), s) 
+          ? (ServiceScope) s : ServiceScope.Singleton;
     }
 
     return new ResolvedDependencyArguments(serviceType, scope);
@@ -114,6 +128,15 @@ internal static class DependencyExtensions {
     }
   }
 
+  /// <summary>
+  /// Analyzes the provided collection of service declarations and organizes them into a dictionary
+  /// where the keys are service types and the values are lists of associated service declarations.
+  /// This method ensures the hierarchical relationship between service types is maintained by
+  /// including all superclasses of a service type in the dictionary.
+  /// </summary>
+  /// <param name="services">The collection of service declarations to process.</param>
+  /// <returns>A dictionary where the keys are <see cref="ITypeSymbol"/> objects representing service types,
+  /// and the values are lists of <see cref="ServiceDeclaration"/> objects associated with each type.</returns>
   public static Dictionary<ITypeSymbol, List<ServiceDeclaration>> GetDependencies(
       this IEnumerable<ServiceDeclaration> services) {
     var result = new Dictionary<ITypeSymbol, List<ServiceDeclaration>>(SymbolEqualityComparer.Default);
@@ -131,6 +154,18 @@ internal static class DependencyExtensions {
   }
 
 
+  /// <summary>
+  /// Determines whether the specified type is considered a "special injectable type."
+  /// Special injectable types are predefined system types that are not meant to be
+  /// directly treated as dependency injection targets, such as primitive types, arrays,
+  /// delegates, and certain system-defined types.
+  /// </summary>
+  /// <param name="currentType">The type symbol to evaluate for being a special injectable type.</param>
+  /// <returns>
+  /// A boolean value indicating whether the given <paramref name="currentType"/> is a
+  /// special injectable type. Returns <c>true</c> if the type matches predefined special
+  /// types, otherwise <c>false</c>.
+  /// </returns>
   public static bool IsSpecialInjectableType(this ITypeSymbol currentType) {
     return currentType.SpecialType is SpecialType.System_Object or SpecialType.System_ValueType or
         SpecialType.System_Enum or SpecialType.System_IDisposable or SpecialType.System_Array or

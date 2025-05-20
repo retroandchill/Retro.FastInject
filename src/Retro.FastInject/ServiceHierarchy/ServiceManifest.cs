@@ -60,67 +60,7 @@ public class ServiceManifest {
     };
 
     foreach (var parameter in constructor.Parameters) {
-      var paramType = parameter.Type;
-
-      // Create parameter resolution
-      var parameterResolution = new ParameterResolution {
-          Parameter = parameter,
-          ParameterType = paramType
-      };
-
-      // Check for FromKeyedServices attribute
-      var fromKeyedServicesAttr = parameter.GetAttributes()
-          .FirstOrDefault(a => a.IsOfAttributeType<FromKeyedServicesAttribute>());
-
-      string? keyName = null;
-      if (fromKeyedServicesAttr is {
-              ConstructorArguments.Length: > 0
-          }) {
-        keyName = fromKeyedServicesAttr.ConstructorArguments[0].Value?.ToString();
-      }
-
-      parameterResolution.Key = keyName;
-
-      // Check if the dependency can be resolved
-      var canResolve = false;
-      ServiceRegistration? selectedService = null;
-
-      if (keyName != null) {
-        // For keyed service, look for service with matching key
-        if (_services.TryGetValue(paramType, out var registrations)) {
-          selectedService = registrations.FirstOrDefault(r => r.Key == keyName);
-          canResolve = selectedService != null;
-        }
-      } else {
-        // For regular service, only look for non-keyed registrations
-        if (_services.TryGetValue(paramType, out var registrations)) {
-          selectedService = registrations.FirstOrDefault(r => r.Key == null);
-          canResolve = selectedService != null;
-        }
-
-        // If we can't resolve directly, check indirect services
-        if (!canResolve && _indirectServices.TryGetValue(paramType, out var implementationType)) {
-          parameterResolution.IsIndirectResolution = true;
-          parameterResolution.IndirectImplementationType = implementationType;
-
-          if (_services.TryGetValue(implementationType, out var implRegistrations)) {
-            selectedService = implRegistrations.FirstOrDefault(r => r.Key == null);
-            canResolve = selectedService != null;
-          }
-        }
-      }
-
-      parameterResolution.SelectedService = selectedService;
-      constructorResolution.Parameters.Add(parameterResolution);
-
-      if (canResolve) continue;
-      // Add the missing dependency to the list with detailed information
-      var dependency = $"{paramType.ToDisplayString()}";
-      if (keyName != null) {
-        dependency += $" with key '{keyName}'";
-      }
-
-      missingDependencies.Add(dependency);
+      ResolveParameterDependencies(parameter, constructorResolution, missingDependencies);
     }
 
     // Store the constructor resolution
@@ -131,6 +71,75 @@ public class ServiceManifest {
           $"Cannot resolve the following dependencies for type '{type.ToDisplayString()}':\n" +
           $"- {string.Join("\n- ", missingDependencies)}");
     }
+  }
+
+  private void ResolveParameterDependencies(IParameterSymbol parameter, ConstructorResolution constructorResolution,
+                                            List<string> missingDependencies) {
+    var (isNullable, paramType) = parameter.Type.CheckIfNullable();
+    
+    // Create parameter resolution
+    var parameterResolution = new ParameterResolution {
+        Parameter = parameter,
+        ParameterType = paramType
+    };
+
+    // Check for FromKeyedServices attribute
+    var fromKeyedServicesAttr = parameter.GetAttributes()
+        .FirstOrDefault(a => a.IsOfAttributeType<FromKeyedServicesAttribute>());
+
+    string? keyName = null;
+    if (fromKeyedServicesAttr is { ConstructorArguments.Length: > 0 }) {
+      keyName = fromKeyedServicesAttr.ConstructorArguments[0].Value?.ToString();
+    }
+
+    parameterResolution.Key = keyName;
+
+    var canResolve = CanResolve(keyName, paramType, parameterResolution, out var selectedService);
+
+    parameterResolution.SelectedService = selectedService;
+    parameterResolution.DefaultValue = parameter.GetDefaultValueString();
+    constructorResolution.Parameters.Add(parameterResolution);
+
+    if (canResolve || isNullable || parameterResolution.DefaultValue is not null) return;
+      
+    // Add the missing dependency to the list with detailed information
+    var dependency = $"{paramType.ToDisplayString()}";
+    if (keyName != null) {
+      dependency += $" with key '{keyName}'";
+    }
+
+    missingDependencies.Add(dependency);
+  }
+
+  private bool CanResolve(string? keyName, ITypeSymbol paramType, ParameterResolution parameterResolution,
+                          out ServiceRegistration? selectedService) {
+    // Check if the dependency can be resolved
+    var canResolve = false;
+    selectedService = null;
+
+    if (keyName != null) {
+      // For keyed service, look for service with matching key
+      if (!_services.TryGetValue(paramType, out var registrations)) return canResolve;
+      selectedService = registrations.FirstOrDefault(r => r.Key == keyName);
+      canResolve = selectedService != null;
+    } else {
+      // For regular service, only look for non-keyed registrations
+      if (_services.TryGetValue(paramType, out var registrations)) {
+        selectedService = registrations.FirstOrDefault(r => r.Key == null);
+        canResolve = selectedService != null;
+      }
+
+      // If we can't resolve directly, check indirect services
+      if (canResolve || !_indirectServices.TryGetValue(paramType, out var implementationType)) return canResolve;
+      parameterResolution.IsIndirectResolution = true;
+      parameterResolution.IndirectImplementationType = implementationType;
+
+      if (!_services.TryGetValue(implementationType, out var implRegistrations)) return canResolve;
+      selectedService = implRegistrations.FirstOrDefault(r => r.Key == null);
+      canResolve = selectedService != null;
+    }
+
+    return canResolve;
   }
 
   private static IMethodSymbol? GetValidConstructor(INamedTypeSymbol type) {

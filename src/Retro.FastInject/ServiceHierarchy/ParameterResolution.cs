@@ -27,6 +27,11 @@ public class ParameterResolution {
   public ServiceRegistration? SelectedService { get; set; }
 
   /// <summary>
+  /// The default value for the parameter, if specified.
+  /// </summary>
+  public string? DefaultValue { get; set; }
+
+  /// <summary>
   /// Whether the parameter was resolved through an indirect service
   /// </summary>
   public bool IsIndirectResolution { get; set; }

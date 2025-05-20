@@ -96,7 +96,12 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         .Select(cr => new {
             cr.Type,
             Parameters = cr.Parameters.Select(p => {
-              var type = p.ParameterType.ToDisplayString();
+              if (p.SelectedService is null || p.DefaultValue is not null) {
+                return p.DefaultValue ?? "null";
+              }
+              
+              var serviceType = p.SelectedService.ImplementationType ?? p.SelectedService.Type;
+              var type = serviceType.ToDisplayString();
               return p.Key is not null
                   ? $"((IKeyedServiceProvider<{type}>) this).GetKeyedService({p.Key})"
                   : $"((IServiceProvider<{type}>) this).GetService()";
