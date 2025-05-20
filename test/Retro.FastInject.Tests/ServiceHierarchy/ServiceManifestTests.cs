@@ -153,6 +153,35 @@ public class ServiceManifestTests {
     // Act & Assert
     Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
   }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithResolvableIndirectDependencies_Succeeds() {
+    // Create a class with dependency
+    const string code = """
+                              namespace Test {
+                                public interface IDependency { }
+                                
+                                public class Dependency : IDependency { }
+                                
+                                public class ServiceWithDependency {
+                                  public ServiceWithDependency(IDependency dependency) { }
+                                }
+                              }
+                        """;
+    
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithDependency");
+    var dependencyType = compilation.GetTypeSymbol("Test.Dependency");
+    
+    // Register the dependency
+    _manifest.AddService(dependencyType, ServiceScope.Singleton);
+    
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
+  }
 
   [Test]
   public void CheckConstructorDependencies_WithNullableDependency_Succeeds() {
