@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Retro.FastInject.Sample.Services;
 
-public sealed class TransientService : ITransientService, IDisposable, IAsyncDisposable {
+public sealed class TransientService(ValueService? valueService) : ITransientService, IDisposable, IAsyncDisposable {
   public void Dispose() {
     throw new NotImplementedException();
   }

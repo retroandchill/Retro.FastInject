@@ -192,4 +192,21 @@ public static class TypeExtensions {
     return numericInterfaces.Concat(bclInterfaces)
         .Any(pi => fullName.StartsWith(pi, StringComparison.Ordinal));
   }
+
+  /// <summary>
+  /// Determines whether the specified <see cref="ITypeSymbol"/> represents a nullable type
+  /// and provides information about its underlying type.
+  /// </summary>
+  /// <param name="type">The type symbol to check for nullability.</param>
+  /// <returns>
+  /// A <see cref="NullableData"/> instance containing information about the nullability
+  /// of the type and its underlying type, if applicable.
+  /// </returns>
+  public static NullableData CheckIfNullable(this ITypeSymbol type) {
+    if (type is INamedTypeSymbol { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T } namedType) {
+      return new NullableData(true, namedType.TypeArguments[0]);
+    }
+
+    return type.NullableAnnotation == NullableAnnotation.Annotated ? new NullableData(true, type.WithNullableAnnotation(NullableAnnotation.None)) : new NullableData(false, type);
+  }
 }

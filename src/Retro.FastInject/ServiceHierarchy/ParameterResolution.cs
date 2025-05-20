@@ -25,6 +25,8 @@ public class ParameterResolution {
   /// The service registration that was selected for this parameter
   /// </summary>
   public ServiceRegistration? SelectedService { get; set; }
+  
+  public string? DefaultValue { get; set; }
 
   /// <summary>
   /// Whether the parameter was resolved through an indirect service
