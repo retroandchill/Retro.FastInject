@@ -249,7 +249,7 @@ internal class TestParameterSymbol : IParameterSymbol {
 
   public ImmutableArray<CustomModifier> RefCustomModifiers => _original.RefCustomModifiers;
 
-  public object ExplicitDefaultValue => _original.ExplicitDefaultValue;
+  public object? ExplicitDefaultValue => _original.ExplicitDefaultValue;
 
   public IParameterSymbol OriginalDefinition => _original.OriginalDefinition;
 

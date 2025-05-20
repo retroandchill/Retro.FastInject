@@ -25,7 +25,10 @@ public class ParameterResolution {
   /// The service registration that was selected for this parameter
   /// </summary>
   public ServiceRegistration? SelectedService { get; set; }
-  
+
+  /// <summary>
+  /// The default value for the parameter, if specified.
+  /// </summary>
   public string? DefaultValue { get; set; }
 
   /// <summary>
