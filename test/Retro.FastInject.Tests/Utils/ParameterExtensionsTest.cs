@@ -182,7 +182,7 @@ public class ParameterExtensionsTests {
     // Assert
     Assert.That(result, Is.EqualTo("TestNamespace.TestEnum.One"));
   }
-  
+
   [Test]
   public void GetDefaultValueString_EnumValueOutOfBounds() {
     // Arrange
@@ -218,137 +218,129 @@ internal static class TestExtensions {
 }
 
 // Simple wrapper to override HasDefaultValue
-internal class TestParameterSymbol : IParameterSymbol {
-  private readonly IParameterSymbol _original;
-  private readonly bool _hasDefaultValue;
+internal class TestParameterSymbol(IParameterSymbol original, bool hasDefaultValue) : IParameterSymbol {
+  public int Ordinal => original.Ordinal;
 
-  public TestParameterSymbol(IParameterSymbol original, bool hasDefaultValue) {
-    _original = original;
-    _hasDefaultValue = hasDefaultValue;
-  }
-
-  public int Ordinal => _original.Ordinal;
-
-  public bool HasExplicitDefaultValue => _hasDefaultValue;
+  public bool HasExplicitDefaultValue => hasDefaultValue;
 
   // Delegate all other members to the original parameter
-  public RefKind RefKind => _original.RefKind;
+  public RefKind RefKind => original.RefKind;
 
-  public bool IsParams => _original.IsParams;
+  public bool IsParams => original.IsParams;
 
-  public bool IsOptional => _original.IsOptional;
+  public bool IsOptional => original.IsOptional;
 
-  public bool IsThis => _original.IsThis;
+  public bool IsThis => original.IsThis;
 
-  public bool IsDiscard => _original.IsDiscard;
+  public bool IsDiscard => original.IsDiscard;
 
-  public ITypeSymbol Type => _original.Type;
-  public NullableAnnotation NullableAnnotation => _original.NullableAnnotation;
+  public ITypeSymbol Type => original.Type;
+  public NullableAnnotation NullableAnnotation => original.NullableAnnotation;
 
-  public ImmutableArray<CustomModifier> CustomModifiers => _original.CustomModifiers;
+  public ImmutableArray<CustomModifier> CustomModifiers => original.CustomModifiers;
 
-  public ImmutableArray<CustomModifier> RefCustomModifiers => _original.RefCustomModifiers;
+  public ImmutableArray<CustomModifier> RefCustomModifiers => original.RefCustomModifiers;
 
-  public object? ExplicitDefaultValue => _original.ExplicitDefaultValue;
+  public object? ExplicitDefaultValue => original.ExplicitDefaultValue;
 
-  public IParameterSymbol OriginalDefinition => _original.OriginalDefinition;
+  public IParameterSymbol OriginalDefinition => original.OriginalDefinition;
 
   // ... implement other interface members by delegating to _original
   public bool Equals(ISymbol? other) {
-    return _original.Equals(other);
+    return original.Equals(other);
   }
 
   public ImmutableArray<AttributeData> GetAttributes() {
-    return _original.GetAttributes();
+    return original.GetAttributes();
   }
 
   public void Accept(SymbolVisitor visitor) {
-    _original.Accept(visitor);
+    original.Accept(visitor);
   }
 
   public TResult? Accept<TResult>(SymbolVisitor<TResult> visitor) {
-    return _original.Accept(visitor);
+    return original.Accept(visitor);
   }
 
   public TResult Accept<TArgument, TResult>(SymbolVisitor<TArgument, TResult> visitor, TArgument argument) {
-    return _original.Accept(visitor, argument);
+    return original.Accept(visitor, argument);
   }
 
   public string? GetDocumentationCommentId() {
-    return _original.GetDocumentationCommentId();
+    return original.GetDocumentationCommentId();
   }
 
   public string? GetDocumentationCommentXml(CultureInfo? preferredCulture = null, bool expandIncludes = false,
                                             CancellationToken cancellationToken = new CancellationToken()) {
-    return _original.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken);
+    return original.GetDocumentationCommentXml(preferredCulture, expandIncludes, cancellationToken);
   }
 
   public string ToDisplayString(SymbolDisplayFormat? format = null) {
-    return _original.ToDisplayString(format);
+    return original.ToDisplayString(format);
   }
 
   public ImmutableArray<SymbolDisplayPart> ToDisplayParts(SymbolDisplayFormat? format = null) {
-    return _original.ToDisplayParts(format);
+    return original.ToDisplayParts(format);
   }
 
   public string ToMinimalDisplayString(SemanticModel semanticModel, int position, SymbolDisplayFormat? format = null) {
-    return _original.ToMinimalDisplayString(semanticModel, position, format);
+    return original.ToMinimalDisplayString(semanticModel, position, format);
   }
 
   public ImmutableArray<SymbolDisplayPart> ToMinimalDisplayParts(SemanticModel semanticModel, int position,
                                                                  SymbolDisplayFormat? format = null) {
-    return _original.ToMinimalDisplayParts(semanticModel, position, format);
+    return original.ToMinimalDisplayParts(semanticModel, position, format);
   }
 
   public bool Equals([NotNullWhen(true)] ISymbol? other, SymbolEqualityComparer equalityComparer) {
-    return _original.Equals(other, equalityComparer);
+    return original.Equals(other, equalityComparer);
   }
 
-  public SymbolKind Kind => _original.Kind;
+  public SymbolKind Kind => original.Kind;
 
-  public string Language => _original.Language;
+  public string Language => original.Language;
 
-  public string Name => _original.Name;
+  public string Name => original.Name;
 
-  public string MetadataName => _original.MetadataName;
+  public string MetadataName => original.MetadataName;
 
-  public int MetadataToken => _original.MetadataToken;
+  public int MetadataToken => original.MetadataToken;
 
-  public ISymbol ContainingSymbol => _original.ContainingSymbol;
+  public ISymbol ContainingSymbol => original.ContainingSymbol;
 
-  public IAssemblySymbol ContainingAssembly => _original.ContainingAssembly;
+  public IAssemblySymbol ContainingAssembly => original.ContainingAssembly;
 
-  public IModuleSymbol ContainingModule => _original.ContainingModule;
+  public IModuleSymbol ContainingModule => original.ContainingModule;
 
-  public INamedTypeSymbol ContainingType => _original.ContainingType;
+  public INamedTypeSymbol ContainingType => original.ContainingType;
 
-  public INamespaceSymbol ContainingNamespace => _original.ContainingNamespace;
+  public INamespaceSymbol ContainingNamespace => original.ContainingNamespace;
 
-  public bool IsDefinition => _original.IsDefinition;
+  public bool IsDefinition => original.IsDefinition;
 
-  public bool IsStatic => _original.IsStatic;
+  public bool IsStatic => original.IsStatic;
 
-  public bool IsVirtual => _original.IsVirtual;
+  public bool IsVirtual => original.IsVirtual;
 
-  public bool IsOverride => _original.IsOverride;
+  public bool IsOverride => original.IsOverride;
 
-  public bool IsAbstract => _original.IsAbstract;
+  public bool IsAbstract => original.IsAbstract;
 
-  public bool IsSealed => _original.IsSealed;
+  public bool IsSealed => original.IsSealed;
 
-  public bool IsExtern => _original.IsExtern;
+  public bool IsExtern => original.IsExtern;
 
-  public bool IsImplicitlyDeclared => _original.IsImplicitlyDeclared;
+  public bool IsImplicitlyDeclared => original.IsImplicitlyDeclared;
 
-  public bool CanBeReferencedByName => _original.CanBeReferencedByName;
+  public bool CanBeReferencedByName => original.CanBeReferencedByName;
 
-  public ImmutableArray<Location> Locations => _original.Locations;
+  public ImmutableArray<Location> Locations => original.Locations;
 
-  public ImmutableArray<SyntaxReference> DeclaringSyntaxReferences => _original.DeclaringSyntaxReferences;
+  public ImmutableArray<SyntaxReference> DeclaringSyntaxReferences => original.DeclaringSyntaxReferences;
 
-  public Accessibility DeclaredAccessibility => _original.DeclaredAccessibility;
+  public Accessibility DeclaredAccessibility => original.DeclaredAccessibility;
 
-  ISymbol ISymbol.OriginalDefinition => ((ISymbol)_original).OriginalDefinition;
+  ISymbol ISymbol.OriginalDefinition => ((ISymbol)original).OriginalDefinition;
 
-  public bool HasUnsupportedMetadata => _original.HasUnsupportedMetadata;
+  public bool HasUnsupportedMetadata => original.HasUnsupportedMetadata;
 }

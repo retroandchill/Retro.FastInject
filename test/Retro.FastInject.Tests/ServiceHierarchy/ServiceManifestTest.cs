@@ -14,6 +14,7 @@ namespace Retro.FastInject.Tests.ServiceHierarchy;
 [TestFixture]
 public class ServiceManifestTest {
   private ServiceManifest _manifest;
+
   private readonly ImmutableArray<Type> _references = [
       typeof(object),
       typeof(ServiceScope),
@@ -35,11 +36,11 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var genericType = (INamedTypeSymbol)compilation.GetTypeSymbol("Test.GenericClass`1");
     var typeParam = genericType.TypeParameters[0]; // Get the type parameter T
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = typeParam };
 
@@ -60,10 +61,10 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var typeSymbol = compilation.GetTypeSymbol("Test.MultipleConstructors");
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = typeSymbol };
 
@@ -87,11 +88,11 @@ public class ServiceManifestTest {
                                 }
                               }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var factoryMethod = compilation.GetMethodSymbol("Test.Factory", "CreateService");
     var serviceType = compilation.GetTypeSymbol("Test.ServiceClass");
-    
+
     // Arrange
     var registration = new ServiceRegistration {
         Type = serviceType,
@@ -114,10 +115,10 @@ public class ServiceManifestTest {
                                 }
                               }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceType = compilation.GetTypeSymbol("Test.ServiceWithDependency");
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = serviceType };
 
@@ -139,21 +140,21 @@ public class ServiceManifestTest {
                                 }
                               }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceType = compilation.GetTypeSymbol("Test.ServiceWithDependency");
     var dependencyType = compilation.GetTypeSymbol("Test.IDependency");
-    
+
     // Register the dependency
     _manifest.AddService(dependencyType, ServiceScope.Singleton);
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = serviceType };
 
     // Act & Assert
     Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
   }
-  
+
   [Test]
   public void CheckConstructorDependencies_WithResolvableIndirectDependencies_Succeeds() {
     // Create a class with dependency
@@ -168,14 +169,14 @@ public class ServiceManifestTest {
                                 }
                               }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceType = compilation.GetTypeSymbol("Test.ServiceWithDependency");
     var dependencyType = compilation.GetTypeSymbol("Test.Dependency");
-    
+
     // Register the dependency
     _manifest.AddService(dependencyType, ServiceScope.Singleton);
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = serviceType };
 
@@ -195,10 +196,10 @@ public class ServiceManifestTest {
                                 }
                               }
                         """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceType = compilation.GetTypeSymbol("Test.ServiceWithNullableDependency");
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = serviceType };
 
@@ -220,14 +221,14 @@ public class ServiceManifestTest {
                             }
                           }
                           """;
-    
+
     var compilation = GeneratorTestHelpers.CreateCompilation(attributeCode, _references);
     var serviceType = compilation.GetTypeSymbol("Test.ServiceWithKeyedDependency");
     var dependencyType = compilation.GetTypeSymbol("Test.IDependency");
-    
+
     // Register the keyed dependency
     _manifest.AddService(dependencyType, ServiceScope.Singleton, key: "testKey");
-    
+
     // Arrange
     var registration = new ServiceRegistration { Type = serviceType };
 

@@ -19,13 +19,13 @@ public static class GeneratorTestHelpers {
                                     assemblies,
                                     new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
   }
-  
+
   public static ITypeSymbol GetTypeSymbol(this Compilation compilation, string typeName) {
     var symbol = compilation.GetTypeByMetadataName(typeName);
     Assert.That(symbol, Is.Not.Null);
     return symbol;
   }
-  
+
   public static IMethodSymbol GetMethodSymbol(this Compilation compilation, string typeName, string methodName) {
     var typeSymbol = (INamedTypeSymbol)GetTypeSymbol(compilation, typeName);
     return typeSymbol.GetMembers(methodName)
