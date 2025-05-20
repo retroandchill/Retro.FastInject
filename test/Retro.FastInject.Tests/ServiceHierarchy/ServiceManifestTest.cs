@@ -12,7 +12,7 @@ using Retro.FastInject.Tests.Utils;
 namespace Retro.FastInject.Tests.ServiceHierarchy;
 
 [TestFixture]
-public class ServiceManifestTests {
+public class ServiceManifestTest {
   private ServiceManifest _manifest;
   private readonly ImmutableArray<Type> _references = [
       typeof(object),
