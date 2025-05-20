@@ -61,4 +61,16 @@
     <data name="ServiceProviderTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
         <value>..\Templates\ServiceProviderTemplate.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
     </data>
+    <data name="DisposableManagementTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\DisposableManagement.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
+    <data name="KeyedServiceSwitchTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\KeyedServiceSwitch.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
+    <data name="ServiceResolutionTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\ServiceResolution.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
+    <data name="ServiceTypeResolutionTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\ServiceTypeResolution.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
 </root>

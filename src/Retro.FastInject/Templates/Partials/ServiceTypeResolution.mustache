@@ -1,0 +1,3 @@
+﻿{{#RegularServices}}
+if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) {{../providerInstance}}).GetService();
+{{/RegularServices}}

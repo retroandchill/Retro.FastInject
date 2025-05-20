@@ -119,6 +119,32 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
 
     var handlebars = Handlebars.Create();
     handlebars.Configuration.TextEncoder = null;
+    
+    // Register partial templates
+    handlebars.RegisterTemplate("DisposableManagement", SourceTemplates.DisposableManagementTemplate);
+    handlebars.RegisterTemplate("ServiceResolution", SourceTemplates.ServiceResolutionTemplate);
+    handlebars.RegisterTemplate("ServiceTypeResolution", SourceTemplates.ServiceTypeResolutionTemplate);
+    handlebars.RegisterTemplate("KeyedServiceSwitch", SourceTemplates.KeyedServiceSwitchTemplate);
+    
+    handlebars.RegisterHelper("withIndent", (writer, options, ctx, parameters) => {
+      var indent = parameters[0] as string ?? "";
+    
+      // Capture the block content
+      var content = options.Template();
+    
+      // Split the content into lines
+      var lines = content.ToString().Split('\n');
+    
+      // Add indentation to each line except empty lines
+      var indentedLines = lines.Select(line => 
+                                           string.IsNullOrWhiteSpace(line) ? line : indent + line);
+    
+      // Join the lines back together
+      writer.WriteSafeString(string.Join("\n", indentedLines));
+    });
+
+
+    
     var template = handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
     
     var templateResult = template(templateParams);

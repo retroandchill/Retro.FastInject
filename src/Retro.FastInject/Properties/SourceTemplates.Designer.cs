@@ -60,6 +60,44 @@ namespace Retro.FastInject {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to {{#DoubleDisposable}}
+        ///_disposables.Add(new DisposableWrapper(service, service));    
+        ///{{/DoubleDisposable}} 
+        ///{{^DoubleDisposable}}
+        ///{{#IsDisposable}}
+        ///_disposables.Add(new DisposableWrapper(service, null));    
+        ///{{/IsDisposable}}
+        ///{{#IsAsyncDisposable}}
+        ///_disposables.Add(new DisposableWrapper(null, service));    
+        ///{{/IsAsyncDisposable}}
+        ///{{/DoubleDisposable}}
+        ///.
+        /// </summary>
+        internal static string DisposableManagementTemplate {
+            get {
+                return ResourceManager.GetString("DisposableManagementTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to switch (serviceKey) {
+        ///  {{#Options}}
+        ///  case &quot;{{Key}}&quot;: {
+        ///    {{&gt; ServiceResolution providerInterface=&apos;IKeyedServiceProvider&apos; getServiceMethod=&apos;GetKeyedService&apos; serviceKey=true isScope=../isScope providerInstance=../providerInstance }}
+        ///  }
+        ///  {{/Options}}
+        ///  default:
+        ///    return null;
+        ///};
+        ///.
+        /// </summary>
+        internal static string KeyedServiceSwitchTemplate {
+            get {
+                return ResourceManager.GetString("KeyedServiceSwitchTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to using System;
         ///using System.Collections.Generic;
         ///using System.Threading;
@@ -69,6 +107,8 @@ namespace Retro.FastInject {
         ///
         ///namespace {{Namespace}};
         ///
+        ///#nullable enable
+        ///
         ///partial class {{ClassName}} : IServiceProvider, 
         ///    {{#RegularServices}}
         ///    IServiceProvider&lt;{{ServiceType}}&gt;,
@@ -77,12 +117,46 @@ namespace Retro.FastInject {
         ///    {{#KeyedServices}}
         ///    IKeyedServiceProvider&lt;{{ServiceType}}&gt;,
         ///    {{/KeyedServices}}
-        ///    IServiceScopeFactory, 
-        ///    ID [rest of string was truncated]&quot;;.
+        ///    IServiceSc [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string ServiceProviderTemplate {
             get {
                 return ResourceManager.GetString("ServiceProviderTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {{#FromOtherService}}
+        ///{{indent}}return (({{providerInterface}}&lt;{{OtherType}}&gt;) {{providerInstance}}).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}});  
+        ///{{/FromOtherService}}
+        ///{{#IsSingleton}}
+        ///{{#if isScope}}
+        ///{{indent}}return (({{providerInterface}}&lt;{{ServiceType}}&gt;) _root).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}}); 
+        ///{{else}}
+        ///return {{InitializingStatement}};
+        ///{{/if}} 
+        ///{{/IsSingleton}}
+        ///{{#IsScoped}}
+        ///{{#if isScope}}    
+        ///return {{InitializingStatement}};
+        ///{{else}}
+        ///return (( [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string ServiceResolutionTemplate {
+            get {
+                return ResourceManager.GetString("ServiceResolutionTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {{#RegularServices}}
+        ///if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider&lt;{{ServiceType}}&gt;) {{../providerInstance}}).GetService();
+        ///{{/RegularServices}}
+        ///.
+        /// </summary>
+        internal static string ServiceTypeResolutionTemplate {
+            get {
+                return ResourceManager.GetString("ServiceTypeResolutionTemplate", resourceCulture);
             }
         }
     }

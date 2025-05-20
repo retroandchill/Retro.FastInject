@@ -1,0 +1,11 @@
+﻿{{#DoubleDisposable}}
+_disposables.Add(new DisposableWrapper(service, service));    
+{{/DoubleDisposable}} 
+{{^DoubleDisposable}}
+{{#IsDisposable}}
+_disposables.Add(new DisposableWrapper(service, null));    
+{{/IsDisposable}}
+{{#IsAsyncDisposable}}
+_disposables.Add(new DisposableWrapper(null, service));    
+{{/IsAsyncDisposable}}
+{{/DoubleDisposable}}

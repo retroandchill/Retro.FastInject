@@ -36,39 +36,18 @@ partial class {{ClassName}} : IServiceProvider,
       return this;
     }
 
-    {{#RegularServices}}
-    if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) this).GetService();
-    {{/RegularServices}}
-    
+    {{#withIndent '    '}}
+    {{> ServiceTypeResolution providerInstance='this'}}
+    {{/withIndent}}    
+
     return null;
   }
-
+  
   {{#RegularServices}}
   {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
-    {{#FromOtherService}}
-    return ((IServiceProvider<{{OtherType}}>) this).GetService();  
-    {{/FromOtherService}}
-    {{#IsSingleton}}
-    return {{InitializingStatement}}; 
-    {{/IsSingleton}}
-    {{#IsScoped}}
-    return ((IServiceProvider<{{ServiceType}}>) GetRootScope()).GetService();    
-    {{/IsScoped}}
-    {{#IsTransient}}
-    var service = {{InitializingStatement}};   
-    {{#DoubleDisposable}}
-    _disposables.Add(new DisposableWrapper(service, service));    
-    {{/DoubleDisposable}} 
-    {{^DoubleDisposable}}
-    {{#IsDisposable}}
-    _disposables.Add(new DisposableWrapper(service, null));    
-    {{/IsDisposable}}
-    {{#IsAsyncDisposable}}
-    _disposables.Add(new DisposableWrapper(null, service));    
-    {{/IsAsyncDisposable}}
-    {{/DoubleDisposable}} 
-    return service; 
-    {{/IsTransient}}
+    {{#withIndent '    '}}
+    {{> ServiceResolution providerInterface='IServiceProvider' getServiceMethod='GetService' isScope=false providerInstance='this'}}
+    {{/withIndent}}
   }  
   {{/RegularServices}}
 
@@ -96,39 +75,10 @@ partial class {{ClassName}} : IServiceProvider,
     {{#FromOtherService}}
     return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);  
     {{/FromOtherService}}
-    {{^FromOtherService}}    
-    switch (serviceKey) {
-      {{#Options}}
-      case "{{Key}}": {
-        {{#FromOtherService}}
-        return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);    
-        {{/FromOtherService}}
-        {{#IsSingleton}}
-        return {{InitializingStatement}};   
-        {{/IsSingleton}}
-        {{#IsScoped}}
-        return ((IKeyedServiceProvider<{{ServiceType}}>) GetRootScope()).GetKeyedService(serviceKey);    
-        {{/IsScoped}}
-        {{#IsTransient}}
-        var service = {{InitializingStatement}};   
-        {{#DoubleDisposable}}
-        _disposables.Add(new DisposableWrapper(service, service));    
-        {{/DoubleDisposable}} 
-        {{^DoubleDisposable}}
-        {{#IsDisposable}}
-        _disposables.Add(new DisposableWrapper(service, null));    
-        {{/IsDisposable}}
-        {{#IsAsyncDisposable}}
-        _disposables.Add(new DisposableWrapper(null, service));    
-        {{/IsAsyncDisposable}}
-        {{/DoubleDisposable}} 
-        return service;  
-        {{/IsTransient}}
-      }
-      {{/Options}}
-      default:
-        return null;
-    };    
+    {{^FromOtherService}}
+    {{#withIndent '    '}}    
+    {{> KeyedServiceSwitch providerInstance='this' isScope=false}}
+    {{/withIndent}}    
     {{/FromOtherService}}
   }
   {{/KeyedServices}}  
@@ -202,39 +152,19 @@ partial class {{ClassName}} : IServiceProvider,
       if (serviceType == typeof(IServiceScopeFactory)) {
         return _root;
       }
-      {{#RegularServices}}
-      if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) this).GetService();
-      {{/RegularServices}}  
+
+      {{#withIndent '      '}}
+      {{> ServiceTypeResolution providerInstance='this'}}
+      {{/withIndent}}
       
       return null;
     }
-
+    
     {{#RegularServices}}
     {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
-      {{#FromOtherService}}
-      return ((IServiceProvider<{{OtherType}}>) this).GetService();  
-      {{/FromOtherService}}
-      {{#IsSingleton}}
-      return ((IServiceProvider<{{ServiceType}}>) _root).GetService();  
-      {{/IsSingleton}}
-      {{#IsScoped}}
-      return {{InitializingStatement}};
-      {{/IsScoped}}
-      {{#IsTransient}}
-      var service = {{ScopedTransientInitializer}};  
-      {{#DoubleDisposable}}
-      _disposables.Add(new DisposableWrapper(service, service));    
-      {{/DoubleDisposable}} 
-      {{^DoubleDisposable}}
-      {{#IsDisposable}}
-      _disposables.Add(new DisposableWrapper(service, null));    
-      {{/IsDisposable}}
-      {{#IsAsyncDisposable}}
-      _disposables.Add(new DisposableWrapper(null, service));    
-      {{/IsAsyncDisposable}}
-      {{/DoubleDisposable}} 
-      return service;   
-      {{/IsTransient}}
+      {{#withIndent '      '}}
+      {{> ServiceResolution providerInterface='IServiceProvider' getServiceMethod='GetService' isScope=true providerInstance='this'}}
+      {{/withIndent}}
     }  
     {{/RegularServices}}
 
@@ -263,38 +193,9 @@ partial class {{ClassName}} : IServiceProvider,
       return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);      
       {{/FromOtherService}}
       {{^FromOtherService}}
-      switch (serviceKey) {
-        {{#Options}}
-        case "{{Key}}": {
-          {{#FromOtherService}}
-          return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);    
-          {{/FromOtherService}}
-          {{#IsSingleton}}
-          return ((IKeyedServiceProvider<{{ServiceType}}>) _root).GetKeyedService(serviceKey); 
-          {{/IsSingleton}}
-          {{#IsScoped}}
-          return {{InitializingStatement}}; 
-          {{/IsScoped}}
-          {{#IsTransient}}
-          var service = {{ScopedTransientInitializer}};  
-          {{#DoubleDisposable}}
-          _disposables.Add(new DisposableWrapper(service, service));    
-          {{/DoubleDisposable}} 
-          {{^DoubleDisposable}}
-          {{#IsDisposable}}
-          _disposables.Add(new DisposableWrapper(service, null));    
-          {{/IsDisposable}}
-          {{#IsAsyncDisposable}}
-          _disposables.Add(new DisposableWrapper(null, service));    
-          {{/IsAsyncDisposable}}
-          {{/DoubleDisposable}} 
-          return service;  
-          {{/IsTransient}}
-        }
-        {{/Options}}
-        default:
-          return null;
-      };
+      {{#withIndent '      '}}    
+      {{> KeyedServiceSwitch providerInstance='this' isScope=true}}
+      {{/withIndent}}
       {{/FromOtherService}}
     }
     {{/KeyedServices}}  

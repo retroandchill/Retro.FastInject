@@ -1,0 +1,11 @@
+﻿switch (serviceKey) {
+  {{#Options}}
+  case "{{Key}}": {
+    {{#withIndent '    '}}
+    {{> ServiceResolution providerInterface='IKeyedServiceProvider' getServiceMethod='GetKeyedService' serviceKey=true isScope=../isScope providerInstance=../providerInstance }}
+    {{/withIndent}}
+  }
+  {{/Options}}
+  default:
+    return null;
+};
