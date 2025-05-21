@@ -83,7 +83,9 @@ namespace Retro.FastInject {
         ///   Looks up a localized string similar to switch (serviceKey) {
         ///  {{#Options}}
         ///  case &quot;{{Key}}&quot;: {
+        ///    {{#withIndent &apos;    &apos;}}
         ///    {{&gt; ServiceResolution providerInterface=&apos;IKeyedServiceProvider&apos; getServiceMethod=&apos;GetKeyedService&apos; serviceKey=true isScope=../isScope providerInstance=../providerInstance }}
+        ///    {{/withIndent}}
         ///  }
         ///  {{/Options}}
         ///  default:
@@ -94,6 +96,23 @@ namespace Retro.FastInject {
         internal static string KeyedServiceSwitchTemplate {
             get {
                 return ResourceManager.GetString("KeyedServiceSwitchTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {{#RegularServices}}
+        ///{{#Primary}}
+        ///{{ServiceType}} IServiceProvider&lt;{{ServiceType}}&gt;.GetService() {
+        ///  {{#withIndent &apos;    &apos;}}
+        ///  {{&gt; ServiceResolution providerInterface=&apos;IServiceProvider&apos; getServiceMethod=&apos;GetService&apos; isScope=../../isScope providerInstance=../../providerInstance}}          
+        ///  {{/withIndent}}
+        ///}
+        ///{{/Primary}}
+        ///{{/RegularServices}}.
+        /// </summary>
+        internal static string RegularServiceGettersTemplate {
+            get {
+                return ResourceManager.GetString("RegularServiceGettersTemplate", resourceCulture);
             }
         }
         

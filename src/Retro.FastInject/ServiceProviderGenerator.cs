@@ -47,12 +47,12 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     // Generate the source
     context.RegisterSourceOutput(compilationAndClasses, (spc, source) => {
       foreach (var classSymbol in source.Right) {
-        Execute(source.Left, classSymbol!, spc);
+        Execute(classSymbol!, spc);
       }
     });
   }
 
-  private static void Execute(Compilation compilation, INamedTypeSymbol classSymbol, SourceProductionContext context) {
+  private static void Execute(INamedTypeSymbol classSymbol, SourceProductionContext context) {
     if (!classSymbol.DeclaringSyntaxReferences
             .Any(x => x.GetSyntax() is ClassDeclarationSyntax classDeclaration
                       && classDeclaration.Modifiers.Any(y => y.IsKind(SyntaxKind.PartialKeyword)))) {
@@ -73,7 +73,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var manifest = classSymbol.GenerateManifest();
 
     // Validate constructor dependencies for all service implementations
-    foreach (var service in manifest.GetUnnamedServices().Concat(manifest.GetKeyedServices())) {
+    foreach (var service in manifest.GetAllServices()) {
       try {
         manifest.CheckConstructorDependencies(service);
       } catch (InvalidOperationException ex) {
@@ -109,25 +109,34 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         })
         .ToDictionary(x => x.Type, x => x.Parameters, TypeSymbolEqualityComparer.Instance);
 
+    var regularServices = manifest.GetAllServices()
+        .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
+        .Select(x => new {
+            ServiceType = x.Key.ToDisplayString(),
+            FromOtherService = manifest.TryGetIndirectService(x.Key, out var implementationType),
+            OtherType = implementationType?.ToDisplayString(),
+            Options = x.Select((y, i) => new ServiceInjection(
+                                   y,
+                                   constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : "",
+                                   i))
+                .ToList()
+        })
+        .ToList();
+    
+    var keyedServices = regularServices
+        .Select(x => x with { 
+            Options = x.Options
+                    .Where(y => y.Key is not null)
+                    .ToList() 
+        })
+        .Where(x => x.Options.Count > 0)
+        .ToList();
+    
     var templateParams = new {
         Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
         ClassName = classSymbol.Name,
-        RegularServices = manifest.GetUnnamedServices()
-            .Select(x => new ServiceInjection(
-                        x, constructorResolutions.TryGetValue(x.Type, out var parameters) ? parameters : ""))
-            .ToList(),
-        KeyedServices = manifest.GetKeyedServices()
-            .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
-            .Select(x => new {
-                ServiceType = x.Key.ToDisplayString(),
-                FromOtherService = manifest.TryGetIndirectService(x.Key, out var implementationType),
-                OtherType = implementationType?.ToDisplayString(),
-                Options = x.Select(y => new ServiceInjection(
-                                       y,
-                                       constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : ""))
-                    .ToList()
-            })
-            .ToList(),
+        RegularServices = regularServices,
+        KeyedServices = keyedServices,
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
             .Where(x => x.ImplementationType is null && x.AssociatedSymbol is not IFieldSymbol and not IPropertySymbol)
             .Select(x => new {
@@ -135,7 +144,8 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                 Name = x.FieldName,
                 x.IsDisposable,
                 x.IsAsyncDisposable
-            }),
+            })
+            .ToList(),
         Scoped = manifest.GetServicesByLifetime(ServiceScope.Scoped)
             .Where(x => x.ImplementationType is null)
             .Select(x => new {
@@ -154,6 +164,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     handlebars.RegisterTemplate("ServiceResolution", SourceTemplates.ServiceResolutionTemplate);
     handlebars.RegisterTemplate("ServiceTypeResolution", SourceTemplates.ServiceTypeResolutionTemplate);
     handlebars.RegisterTemplate("KeyedServiceSwitch", SourceTemplates.KeyedServiceSwitchTemplate);
+    handlebars.RegisterTemplate("RegularServiceGetters", SourceTemplates.RegularServiceGettersTemplate);
 
     handlebars.RegisterHelper("withIndent", (writer, options, ctx, parameters) => {
       var indent = parameters[0] as string ?? "";

@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
 
 namespace Retro.FastInject.ServiceHierarchy;
 
@@ -40,4 +41,10 @@ public class ParameterResolution {
   /// The indirect implementation type if IsIndirectResolution is true
   /// </summary>
   public ITypeSymbol? IndirectImplementationType { get; set; }
+  
+  public bool HasNoDeclaration { get; set; }
+  
+  public bool HasMultipleRegistrations { get; set; }
+
+  public List<ServiceRegistration> MultipleServices { get; set; } = [];
 }

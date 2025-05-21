@@ -7,7 +7,7 @@ namespace Retro.FastInject.ServiceHierarchy;
 /// Represents a service injection that is used to hold details about a service
 /// registration and its associated parameters, used during dependency injection.
 /// </summary>
-public class ServiceInjection(ServiceRegistration registration, string parameters) {
+public class ServiceInjection(ServiceRegistration registration, string parameters, int index = 0) {
   /// <summary>
   /// Gets the display string representing the type of the service associated with this injection.
   /// </summary>
@@ -17,6 +17,17 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// formatted to a display-friendly representation via the <c>ToDisplayString</c> method.
   /// </remarks>
   public string ServiceType { get; } = registration.Type.ToDisplayString();
+
+  /// <summary>
+  /// Gets the name of the service associated with this injection.
+  /// </summary>
+  /// <remarks>
+  /// This property retrieves the unqualified name of the service type represented by
+  /// the associated <see cref="ServiceRegistration"/>. The name is derived from the
+  /// <c>Name</c> property of the <see cref="ITypeSymbol"/> specified during the registration
+  /// process.
+  /// </remarks>
+  public string ServiceName { get; } = registration.Type.Name;
 
   /// <summary>
   /// Gets the name of the field used for storing the service during dependency injection.
@@ -91,6 +102,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// more granular control over dependency injection scenarios.
   /// </remarks>
   public string? Key { get; } = registration.Key;
+  
+  public string? KeyedFetch { get; set; }
 
   /// <summary>
   /// Gets the initializing statement for the service, representing the code required
@@ -118,7 +131,7 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// additional handling for scoped and transient lifetimes when creating instances.
   /// </remarks>
   public string ScopedTransientInitializer { get; } = registration.GetInitializingStatement(parameters, true);
-
+  
   /// <summary>
   /// Indicates whether the service associated with this injection is disposable.
   /// </summary>
@@ -140,5 +153,27 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// </remarks>
   public bool IsAsyncDisposable { get; } = registration.IsAsyncDisposable;
 
+  /// <summary>
+  /// Gets a value that indicates whether the service is both disposable and asynchronously disposable.
+  /// </summary>
+  /// <remarks>
+  /// This property evaluates to <c>true</c> if the service associated with the current
+  /// registration implements both <c>IDisposable</c> and <c>IAsyncDisposable</c> interfaces.
+  /// It combines the values of the <see cref="ServiceRegistration.IsDisposable"/> and
+  /// <see cref="ServiceRegistration.IsAsyncDisposable"/> properties to determine if the service
+  /// requires proper cleanup through both synchronous and asynchronous disposal mechanisms.
+  /// </remarks>
   public bool DoubleDisposable { get; } = registration.IsDisposable && registration.IsAsyncDisposable;
+
+  /// <summary>
+  /// Gets or sets the index of this service injection within its associated collection or system.
+  /// </summary>
+  /// <remarks>
+  /// This property represents the positional identifier of the service injection in the context
+  /// of the dependency injection framework. It is used for tracking or ordering service registrations
+  /// where applicable.
+  /// </remarks>
+  public int Index { get; } = index;
+
+  public bool IsPrimary => Index == 0;
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Annotations;
@@ -103,12 +104,24 @@ public class ServiceManifest {
     if (canResolve || isNullable || parameterResolution.DefaultValue is not null) return;
       
     // Add the missing dependency to the list with detailed information
-    var dependency = $"{paramType.ToDisplayString()}";
+    var dependency = new StringBuilder(paramType.ToDisplayString());
     if (keyName != null) {
-      dependency += $" with key '{keyName}'";
+      dependency.Append($" with key '{keyName}'");
     }
 
-    missingDependencies.Add(dependency);
+    // Add more specific error information
+    if (parameterResolution.HasNoDeclaration) {
+      dependency.Append(" (No service declaration found)");
+    } else if (parameterResolution is { HasMultipleRegistrations: true, MultipleServices.Count: > 0 }) {
+      dependency.Append($" (Multiple registrations found: {parameterResolution.MultipleServices.Count})");
+      // Optionally add details about the multiple registrations
+      foreach (var service in parameterResolution.MultipleServices) {
+        var implType = service.ImplementationType?.ToDisplayString() ?? service.Type.ToDisplayString();
+        dependency.Append($"\n  -- {implType}" + (service.Key != null ? $" with key '{service.Key}'" : ""));
+      }
+    }
+  
+    missingDependencies.Add(dependency.ToString());
   }
 
   private bool CanResolve(string? keyName, ITypeSymbol paramType, ParameterResolution parameterResolution,
@@ -119,25 +132,40 @@ public class ServiceManifest {
 
     if (keyName != null) {
       // For keyed service, look for service with matching key
-      if (!_services.TryGetValue(paramType, out var registrations)) return canResolve;
+      if (!_services.TryGetValue(paramType, out var registrations)) {
+        parameterResolution.HasNoDeclaration = true;
+        return canResolve;
+      }
       selectedService = registrations.FirstOrDefault(r => r.Key == keyName);
-      canResolve = selectedService != null;
     } else {
       // For regular service, only look for non-keyed registrations
       if (_services.TryGetValue(paramType, out var registrations)) {
-        selectedService = registrations.FirstOrDefault(r => r.Key == null);
+        try {
+          selectedService = registrations.SingleOrDefault();
+        } catch (InvalidOperationException) {
+          parameterResolution.HasMultipleRegistrations = true;
+          parameterResolution.MultipleServices = registrations.ToList();
+          selectedService = null;
+        }
+  
         canResolve = selectedService != null;
+      } else {
+        parameterResolution.HasNoDeclaration = true;
       }
-
+  
       // If we can't resolve directly, check indirect services
       if (canResolve || !_indirectServices.TryGetValue(paramType, out var implementationType)) return canResolve;
       parameterResolution.IsIndirectResolution = true;
       parameterResolution.IndirectImplementationType = implementationType;
-
-      if (!_services.TryGetValue(implementationType, out var implRegistrations)) return canResolve;
-      selectedService = implRegistrations.FirstOrDefault(r => r.Key == null);
-      canResolve = selectedService != null;
+  
+      if (!_services.TryGetValue(implementationType, out var implRegistrations)) {
+        parameterResolution.HasNoDeclaration = true;
+        return canResolve;
+      }
+      selectedService = implRegistrations.FirstOrDefault();
     }
+
+    canResolve = selectedService != null;
 
     return canResolve;
   }
@@ -214,27 +242,14 @@ public class ServiceManifest {
   }
 
   /// <summary>
-  /// Retrieves all service registrations that have an associated key.
+  /// Retrieves all service registrations.
   /// </summary>
   /// <returns>
-  /// An enumerable collection of service registrations where a key is specified.
+  /// An enumerable collection of service registrations.
   /// </returns>
-  public IEnumerable<ServiceRegistration> GetKeyedServices() {
+  public IEnumerable<ServiceRegistration> GetAllServices() {
     return _services.Values
-        .SelectMany(list => list)
-        .Where(reg => reg.Key != null);
-  }
-
-  /// <summary>
-  /// Retrieves all service registrations that do not have a specified key.
-  /// </summary>
-  /// <returns>
-  /// An enumerable collection of unnamed service registrations.
-  /// </returns>
-  public IEnumerable<ServiceRegistration> GetUnnamedServices() {
-    return _services.Values
-        .SelectMany(list => list)
-        .Where(reg => reg.Key == null);
+        .SelectMany(list => list);
   }
 
   /// <summary>

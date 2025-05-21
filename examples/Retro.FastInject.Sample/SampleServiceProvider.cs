@@ -6,6 +6,7 @@ namespace Retro.FastInject.Sample;
 [ServiceProvider]
 [Singleton<SingletonService>]
 [Singleton<KeyedSingleton>(Key = "keyed")]
+[Singleton<OtherSingletonService>(Key = "other")]
 [Scoped<ScopedService>]
 [Transient<TransientService>]
 [Singleton<ValueService>]
