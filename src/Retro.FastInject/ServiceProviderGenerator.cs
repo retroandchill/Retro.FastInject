@@ -47,12 +47,12 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     // Generate the source
     context.RegisterSourceOutput(compilationAndClasses, (spc, source) => {
       foreach (var classSymbol in source.Right) {
-        Execute(classSymbol!, spc);
+        Execute(source.Left, classSymbol!, spc);
       }
     });
   }
 
-  private static void Execute(INamedTypeSymbol classSymbol, SourceProductionContext context) {
+  private static void Execute(Compilation compilation, INamedTypeSymbol classSymbol, SourceProductionContext context) {
     if (!classSymbol.DeclaringSyntaxReferences
             .Any(x => x.GetSyntax() is ClassDeclarationSyntax classDeclaration
                       && classDeclaration.Modifiers.Any(y => y.IsKind(SyntaxKind.PartialKeyword)))) {
@@ -73,9 +73,10 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var manifest = classSymbol.GenerateManifest();
 
     // Validate constructor dependencies for all service implementations
-    foreach (var service in manifest.GetAllServices()) {
+    var explicitServices = manifest.GetAllServices().ToList();
+    foreach (var service in explicitServices) {
       try {
-        manifest.CheckConstructorDependencies(service);
+        manifest.CheckConstructorDependencies(service, compilation);
       } catch (InvalidOperationException ex) {
         context.ReportDiagnostic(Diagnostic.Create(
                                      new DiagnosticDescriptor(
@@ -95,17 +96,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var constructorResolutions = manifest.GetAllConstructorResolutions()
         .Select(cr => new {
             cr.Type,
-            Parameters = cr.Parameters.Select(p => {
-              if (p.SelectedService is null || p.DefaultValue is not null) {
-                return p.DefaultValue ?? "null";
-              }
-              
-              var serviceType = p.SelectedService.ImplementationType ?? p.SelectedService.Type;
-              var type = serviceType.ToDisplayString();
-              return p.Key is not null
-                  ? $"((IKeyedServiceProvider<{type}>) this).GetKeyedService({p.Key})"
-                  : $"((IServiceProvider<{type}>) this).GetService()";
-            }).Joining(", ")
+            Parameters = cr.Parameters.Select(p => p.GetArgDefaultValue()).Joining(", ")
         })
         .ToDictionary(x => x.Type, x => x.Parameters, TypeSymbolEqualityComparer.Instance);
 
@@ -113,12 +104,9 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
         .Select(x => new {
             ServiceType = x.Key.ToDisplayString(),
-            FromOtherService = manifest.TryGetIndirectService(x.Key, out var implementationType),
-            OtherType = implementationType?.ToDisplayString(),
-            Options = x.Select((y, i) => new ServiceInjection(
-                                   y,
-                                   constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : "",
-                                   i))
+            Options = x.Select(y => new ServiceInjection(y,
+                                   constructorResolutions.TryGetValue(x.Key, out var parameters) 
+                                       ? parameters : ""))
                 .ToList()
         })
         .ToList();
@@ -166,14 +154,14 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     handlebars.RegisterTemplate("KeyedServiceSwitch", SourceTemplates.KeyedServiceSwitchTemplate);
     handlebars.RegisterTemplate("RegularServiceGetters", SourceTemplates.RegularServiceGettersTemplate);
 
-    handlebars.RegisterHelper("withIndent", (writer, options, ctx, parameters) => {
+    handlebars.RegisterHelper("withIndent", (writer, options, _, parameters) => {
       var indent = parameters[0] as string ?? "";
 
       // Capture the block content
       var content = options.Template();
 
       // Split the content into lines
-      var lines = content.ToString().Split('\n');
+      var lines = content.Split('\n');
 
       // Add indentation to each line except empty lines
       var indentedLines = lines.Select(line =>

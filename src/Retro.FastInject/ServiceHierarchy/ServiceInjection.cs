@@ -1,4 +1,6 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 
 namespace Retro.FastInject.ServiceHierarchy;
@@ -7,7 +9,7 @@ namespace Retro.FastInject.ServiceHierarchy;
 /// Represents a service injection that is used to hold details about a service
 /// registration and its associated parameters, used during dependency injection.
 /// </summary>
-public class ServiceInjection(ServiceRegistration registration, string parameters, int index = 0) {
+public class ServiceInjection(ServiceRegistration registration, string parameters) {
   /// <summary>
   /// Gets the display string representing the type of the service associated with this injection.
   /// </summary>
@@ -69,7 +71,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// A singleton service is instantiated once and shared for the duration of the application lifecycle.
   /// </remarks>
   public bool IsSingleton { get; } =
-    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Singleton;
+    registration.ImplementationType is null && registration.CollectedServices is null 
+                                            && registration.Lifetime == ServiceScope.Singleton;
 
   /// <summary>
   /// Gets a value indicating whether the service has a scoped lifecycle in the dependency injection container.
@@ -80,7 +83,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// request and are shared within the scope of that request.
   /// </remarks>
   public bool IsScoped { get; } =
-    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Scoped;
+    registration.ImplementationType is null && registration.CollectedServices is null 
+                                            && registration.Lifetime == ServiceScope.Scoped;
 
   /// <summary>
   /// Indicates whether the service associated with this injection has a transient lifecycle.
@@ -91,7 +95,33 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// providing a new instance on every injection.
   /// </remarks>
   public bool IsTransient { get; } =
-    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Transient;
+    registration.ImplementationType is null && registration.CollectedServices is null 
+                                            && registration.Lifetime == ServiceScope.Transient;
+
+  /// <summary>
+  /// Indicates whether this service represents a collection of other services.
+  /// </summary>
+  /// <remarks>
+  /// This property evaluates to true if the service is a collection containing multiple
+  /// service registrations, represented by the <c>CollectedServices</c> property. It is determined
+  /// by checking that the <c>ImplementationType</c> is null and that <c>CollectedServices</c> is not null.
+  /// </remarks>
+  public bool IsCollection { get; } = registration.ImplementationType is null && registration.CollectedServices is not null;
+
+  /// <summary>
+  /// Gets a collection of services associated with this registration if the service
+  /// represents a collection of multiple services.
+  /// </summary>
+  /// <remarks>
+  /// This property provides a list of collected services derived from the associated
+  /// <see cref="ServiceRegistration.CollectedServices"/>. Each service in the collection
+  /// is encapsulated within a <see cref="CollectedService"/> instance, allowing access
+  /// to additional details such as service type, index, and primary/last service indicators.
+  /// If no collected services are associated, this property returns an empty list.
+  /// </remarks>
+  public List<CollectedService> CollectedServices { get; } = registration.CollectedServices
+      ?.Select((x, i) => new CollectedService(x, i == registration.CollectedServices.Count))
+      .ToList() ?? [];
 
   /// <summary>
   /// Gets the unique identifier (key) associated with the service registration.
@@ -102,8 +132,6 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// more granular control over dependency injection scenarios.
   /// </remarks>
   public string? Key { get; } = registration.Key;
-  
-  public string? KeyedFetch { get; set; }
 
   /// <summary>
   /// Gets the initializing statement for the service, representing the code required
@@ -173,7 +201,7 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// of the dependency injection framework. It is used for tracking or ordering service registrations
   /// where applicable.
   /// </remarks>
-  public int Index { get; } = index;
+  public int Index { get; } = registration.IndexForType;
 
   public bool IsPrimary => Index == 0;
 }

@@ -46,7 +46,7 @@ public class ServiceManifestTest {
 
     // Act & Assert
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration));
+                                                          _manifest.CheckConstructorDependencies(registration, compilation));
     Assert.That(ex?.Message, Contains.Substring("is not a named type"));
   }
 
@@ -70,7 +70,7 @@ public class ServiceManifestTest {
 
     // Act & Assert
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration));
+                                                          _manifest.CheckConstructorDependencies(registration, compilation));
     Assert.That(ex?.Message, Contains.Substring("has multiple public constructors"));
   }
 
@@ -100,7 +100,7 @@ public class ServiceManifestTest {
     };
 
     // Act & Assert
-    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
   }
 
   [Test]
@@ -124,7 +124,7 @@ public class ServiceManifestTest {
 
     // Act & Assert
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration));
+                                                          _manifest.CheckConstructorDependencies(registration, compilation));
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
   }
 
@@ -152,7 +152,7 @@ public class ServiceManifestTest {
     var registration = new ServiceRegistration { Type = serviceType };
 
     // Act & Assert
-    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
   }
 
   [Test]
@@ -181,7 +181,7 @@ public class ServiceManifestTest {
     var registration = new ServiceRegistration { Type = serviceType };
 
     // Act & Assert
-    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
   }
 
   [Test]
@@ -204,7 +204,7 @@ public class ServiceManifestTest {
     var registration = new ServiceRegistration { Type = serviceType };
 
     // Act & Assert
-    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
   }
 
   [Test]
@@ -233,6 +233,6 @@ public class ServiceManifestTest {
     var registration = new ServiceRegistration { Type = serviceType };
 
     // Act & Assert
-    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
   }
 }

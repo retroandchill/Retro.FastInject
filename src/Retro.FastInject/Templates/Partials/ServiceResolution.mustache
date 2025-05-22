@@ -20,3 +20,10 @@ var service = {{#if isScope}}{{ScopedTransientInitializer}}{{else}}{{Initializin
 {{> DisposableManagement}}
 return service;  
 {{/IsTransient}}
+{{#IsCollection}}
+return [
+  {{#CollectedServices}}
+  {{#IsPrimary}}((IServiceProvider<{{ServiceType}}>) this).GetService(){{/IsPrimary}}{{^IsPrimary}}this.Get{{ServiceName}}_{{Index}}(){{/IsPrimary}}{{^IsLast}},{{/IsLast}}
+  {{/CollectedServices}} 
+];
+{{/IsCollection}}
