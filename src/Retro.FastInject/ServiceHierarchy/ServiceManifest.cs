@@ -149,7 +149,8 @@ public class ServiceManifest {
     } else {
       // Check if the type is a collection type
       if (keyName is null && paramType is INamedTypeSymbol { IsGenericType: true } namedType 
-                          && CanResolveGenericType(namedType, compilation, ref selectedService)) {
+                          && CanResolveGenericType(namedType, compilation, parameterResolution.Parameter,
+                                                   ref selectedService)) {
         return true;
       }
       parameterResolution.HasNoDeclaration = true;
@@ -158,7 +159,9 @@ public class ServiceManifest {
     return canResolve;
   }
 
-  private bool CanResolveGenericType(INamedTypeSymbol namedType, Compilation compilation, ref ServiceRegistration? selectedService) {
+  private bool CanResolveGenericType(INamedTypeSymbol namedType, Compilation compilation, 
+                                     IParameterSymbol targetParameter,
+                                     ref ServiceRegistration? selectedService) {
     var genericTypeName = namedType.ConstructedFrom.ToDisplayString();
     if (genericTypeName is not ("System.Collections.Generic.IEnumerable<T>" or
         "System.Collections.Generic.IReadOnlyCollection<T>" or
@@ -166,7 +169,14 @@ public class ServiceManifest {
         "System.Collections.Immutable.ImmutableArray<T>")) return false;
     
     var elementType = namedType.TypeArguments[0];
-    if (!_services.TryGetValue(elementType, out var elementServices)) return false;
+    if (!_services.TryGetValue(elementType, out var elementServices)) {
+      elementServices = [];
+    }
+    
+    var requireNonEmptyAttribute = targetParameter.GetAttribute<RequireNonEmptyAttribute>();
+    if (requireNonEmptyAttribute is not null && elementServices.Count == 0) {
+      return false;
+    }
       
     var immutableArrayType = typeof(ImmutableArray<>).GetInstantiatedGeneric(compilation, elementType);
     AddService(immutableArrayType, ServiceScope.Transient);
@@ -179,6 +189,7 @@ public class ServiceManifest {
         collectedServices: elementServices
             .Select(ResolveConcreteType)
             .ToList());
+    selectedService = _services[immutableArrayType][0];
     return true;
   }
 

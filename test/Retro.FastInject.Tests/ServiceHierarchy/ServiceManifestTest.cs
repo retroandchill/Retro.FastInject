@@ -486,16 +486,50 @@ public class ServiceManifestTest {
   }
   
   [Test]
-  public void CheckConstructorDependencies_WithEmptyCollectionDependency_Fails() {
+  public void CheckConstructorDependencies_WithEmptyCollectionDependency_Suceeds() {
     // Create a class with a collection dependency for which no implementations exist
     const string code = """
                         using System.Collections.Generic;
-                        
+
                         namespace Test {
                           public interface INotRegistered { }
                           
                           public class ServiceWithEmptyCollection {
                             public ServiceWithEmptyCollection(IEnumerable<INotRegistered> items) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithEmptyCollection");
+  
+    // Arrange (no implementations registered)
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should fail because there are no implementations of INotRegistered
+    Assert.DoesNotThrow(() =>  _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithEmptyCollectionDependency_RequireNonEmpty_Fails() {
+    // Create a class with a collection dependency for which no implementations exist
+    const string code = """
+                        using System.Collections.Generic;
+                        using Retro.FastInject.Annotations;
+                        
+                        namespace Test {
+                          public interface INotRegistered { }
+                          
+                          public class ServiceWithEmptyCollection {
+                            public ServiceWithEmptyCollection([RequireNonEmpty] IEnumerable<INotRegistered> items) { }
                           }
                         }
                         """;
