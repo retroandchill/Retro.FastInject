@@ -547,4 +547,210 @@ public class ServiceManifestTest {
     
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
   }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithMultipleServices_NoKey_ThrowsInvalidOperationException() {
+    // Create interface with multiple implementations
+    const string code = """
+                        namespace Test {
+                          public interface IMultiService { }
+                          
+                          public class ServiceImpl1 : IMultiService { }
+                          
+                          public class ServiceImpl2 : IMultiService { }
+                          
+                          public class ServiceConsumer {
+                            public ServiceConsumer(IMultiService service) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceConsumer");
+    var interfaceType = compilation.GetTypeSymbol("Test.IMultiService");
+    var impl1Type = compilation.GetTypeSymbol("Test.ServiceImpl1");
+    var impl2Type = compilation.GetTypeSymbol("Test.ServiceImpl2");
+  
+    // Register multiple implementations for the same interface
+    _manifest.AddService(impl1Type, ServiceScope.Singleton);
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, impl1Type);
+    _manifest.AddService(impl2Type, ServiceScope.Singleton);
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, impl2Type);
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should fail because there are multiple implementations of IMultiService without a key
+    var ex = Assert.Throws<InvalidOperationException>(() => 
+        _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
+    Assert.That(ex?.Message, Contains.Substring("Multiple registrations found: 2"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithMultipleServices_WithKey_Succeeds() {
+    // Create interface with multiple implementations and use key to resolve
+    const string code = """
+                        using Retro.FastInject.Annotations;
+                        using Microsoft.Extensions.DependencyInjection;
+                        
+                        namespace Test {
+                          public interface IMultiService { }
+                          
+                          public class ServiceImpl1 : IMultiService { }
+                          
+                          public class ServiceImpl2 : IMultiService { }
+                          
+                          public class ServiceConsumer {
+                            public ServiceConsumer([FromKeyedServices("impl1")] IMultiService service) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceConsumer");
+    var interfaceType = compilation.GetTypeSymbol("Test.IMultiService");
+    var impl1Type = compilation.GetTypeSymbol("Test.ServiceImpl1");
+    var impl2Type = compilation.GetTypeSymbol("Test.ServiceImpl2");
+  
+    // Register multiple implementations for the same interface with different keys
+    _manifest.AddService(impl1Type, ServiceScope.Singleton, key: "impl1");
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, impl1Type, key: "impl1");
+    _manifest.AddService(impl2Type, ServiceScope.Singleton, key: "impl2");
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, impl2Type, key: "impl2");
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should succeed because we use a key to disambiguate
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+    
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Key, Is.EqualTo("impl1"));
+    Assert.That(paramResolution.SelectedService, Is.Not.Null);
+    Assert.That(SymbolEqualityComparer.Default.Equals(paramResolution.SelectedService.Type, impl1Type), Is.True);
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithMultipleServices_MixedCollectionAndSingular_Succeeds() {
+    // Create a scenario with both collection and singular service injections
+    const string code = """
+                        using System.Collections.Generic;
+                        using Retro.FastInject.Annotations;
+                        using Microsoft.Extensions.DependencyInjection;
+                        
+                        namespace Test {
+                          public interface IMultiService { }
+                          
+                          public class ServiceImpl1 : IMultiService { }
+                          
+                          public class ServiceImpl2 : IMultiService { }
+                          
+                          public class ComplexServiceConsumer {
+                            public ComplexServiceConsumer(
+                                [FromKeyedServices("primary")] IMultiService primaryService,
+                                IEnumerable<IMultiService> allServices) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ComplexServiceConsumer");
+    var interfaceType = compilation.GetTypeSymbol("Test.IMultiService");
+    var impl1Type = compilation.GetTypeSymbol("Test.ServiceImpl1");
+    var impl2Type = compilation.GetTypeSymbol("Test.ServiceImpl2");
+  
+    // Register multiple implementations with different keys
+    _manifest.AddService(impl1Type, ServiceScope.Singleton, key: "primary");
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, impl1Type, key: "primary");
+    _manifest.AddService(impl2Type, ServiceScope.Singleton, key: "secondary");
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, impl2Type, key: "secondary");
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should succeed - resolving both the keyed service and the collection
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(2));
+    
+    // First parameter should be the keyed service
+    var keyedParamResolution = resolution.Parameters[0];
+    Assert.That(keyedParamResolution.Key, Is.EqualTo("primary"));
+    Assert.That(keyedParamResolution.SelectedService, Is.Not.Null);
+    
+    // Second parameter should be the collection
+    var collectionParamResolution = resolution.Parameters[1];
+    Assert.That(collectionParamResolution.Parameter.Type.ToDisplayString(), 
+        Is.EqualTo("System.Collections.Generic.IEnumerable<Test.IMultiService>"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithMultipleServices_DifferentLifetimes_Succeeds() {
+    // Create interface with multiple implementations with different lifetimes
+    const string code = """
+                        using Retro.FastInject.Annotations;
+                        using Microsoft.Extensions.DependencyInjection;
+                        
+                        namespace Test {
+                          public interface IMixedLifetimeService { }
+                          
+                          public class SingletonImpl : IMixedLifetimeService { }
+                          
+                          public class TransientImpl : IMixedLifetimeService { }
+                          
+                          public class LifetimeConsumer {
+                            public LifetimeConsumer([FromKeyedServices("singleton")] IMixedLifetimeService service) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.LifetimeConsumer");
+    var interfaceType = compilation.GetTypeSymbol("Test.IMixedLifetimeService");
+    var singletonType = compilation.GetTypeSymbol("Test.SingletonImpl");
+    var transientType = compilation.GetTypeSymbol("Test.TransientImpl");
+  
+    // Register multiple implementations with different lifetimes
+    _manifest.AddService(singletonType, ServiceScope.Singleton, key: "singleton");
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, singletonType, key: "singleton");
+    _manifest.AddService(transientType, ServiceScope.Transient, key: "transient");
+    _manifest.AddService(interfaceType, ServiceScope.Transient, transientType, key: "transient");
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should succeed because we use a key to disambiguate
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored with correct lifetime
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+    
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Key, Is.EqualTo("singleton"));
+    Assert.That(paramResolution.SelectedService, Is.Not.Null);
+    Assert.That(paramResolution.SelectedService.Lifetime, Is.EqualTo(ServiceScope.Singleton));
+    Assert.That(SymbolEqualityComparer.Default.Equals(paramResolution.SelectedService.Type, singletonType), Is.True);
+  }
 }
