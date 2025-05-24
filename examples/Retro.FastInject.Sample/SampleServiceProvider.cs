@@ -12,6 +12,8 @@ namespace Retro.FastInject.Sample;
 [Transient<TransientService>]
 [Transient(typeof(Logger<>))]
 [Singleton<ValueService>]
+[Singleton<GenericService<int>>]
+[Singleton<GenericService<float>>]
 public sealed partial class SampleServiceProvider(int value, float simpleValue) {
 
   [Instance]
@@ -23,7 +25,7 @@ public sealed partial class SampleServiceProvider(int value, float simpleValue) 
   }
 
   [Factory]
-  private LoggerFactory CreateLoggerFactory() {
+  private static LoggerFactory CreateLoggerFactory() {
     return new LoggerFactory();
   }
   

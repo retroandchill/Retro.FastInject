@@ -257,5 +257,22 @@ public static class TypeExtensions {
     // Construct the generic type with the provided element type(s)
     return namedType.Construct(elementTypes);
   }
+
+  /// <summary>
+  /// Generates a sanitized string representation of the given <see cref="ITypeSymbol"/>.
+  /// For generic types, the result includes a concatenated format of the type's name and its type arguments.
+  /// </summary>
+  /// <param name="type">The <see cref="ITypeSymbol"/> to generate a sanitized name for.</param>
+  /// <returns>
+  /// A sanitized string representation of the type, formatted as the type name. For generic types,
+  /// the type arguments are included as an underscore-separated list.
+  /// </returns>
+  public static string GetSanitizedTypeName(this ITypeSymbol type) {
+    return type is not INamedTypeSymbol { IsGenericType: true } namedType ? type.Name 
+        : $"{type.Name}_{namedType.TypeArguments
+            .Select(x => x.GetSanitizedTypeName())
+            .Joining("_")}";
+
+  }
   
 }

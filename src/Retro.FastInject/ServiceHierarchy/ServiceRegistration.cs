@@ -2,6 +2,7 @@
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Utils;
 
 namespace Retro.FastInject.ServiceHierarchy;
 
@@ -92,7 +93,7 @@ public record ServiceRegistration {
         suffix = $"_{IndexForType}";
       }
 
-      return $"_{Type.Name}{suffix}";
+      return $"_{Type.GetSanitizedTypeName()}{suffix}";
     }
   }
 
@@ -138,7 +139,7 @@ public record ServiceRegistration {
 
   private string GetMethodInvocation(IMethodSymbol method, bool scopedTransient) {
     if (method.IsStatic) {
-      return method.ToDisplayString();
+      return method.ToDisplayString(new SymbolDisplayFormat(memberOptions: SymbolDisplayMemberOptions.None));
     }
 
     return Lifetime == ServiceScope.Scoped || scopedTransient ? $"_root.{method.Name}" : method.Name;

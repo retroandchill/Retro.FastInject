@@ -193,7 +193,7 @@ public class ServiceManifest {
                  .Where(x => !x.IsSpecialInjectableType() && !x.Equals(implementationType, SymbolEqualityComparer.Default))) {
       AddService(superclass, unboundService.Lifetime, implementationType, unboundService.AssociatedSymbol, unboundService.Key);
     }
-    CheckConstructorDependencies(selectedService, compilation);;
+    CheckConstructorDependencies(selectedService, compilation);
       
     return true;
   }
