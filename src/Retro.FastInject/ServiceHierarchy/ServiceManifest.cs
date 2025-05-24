@@ -163,10 +163,8 @@ public class ServiceManifest {
     path.Push(type);
     
     // If we have a constructor resolution for this type, check its dependencies
-    if (_constructorResolutions.TryGetValue(type, out var resolution)) {
-      if (CheckServiceCycle(visited, path, onPath, ref cycle, resolution)) return true;
-    }
-    
+    if (_constructorResolutions.TryGetValue(type, out var resolution) && CheckServiceCycle(visited, path, onPath, ref cycle, resolution)) return true;
+
     // Done with this node
     path.Pop();
     onPath.Remove(type);
