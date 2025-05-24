@@ -270,6 +270,14 @@ public class ServiceManifest {
     foreach (var superclass in implementationType.GetAllSuperclasses()
                  .Where(x => !x.IsSpecialInjectableType() && !x.Equals(implementationType, SymbolEqualityComparer.Default))) {
       AddService(superclass, unboundService.Lifetime, implementationType, unboundService.AssociatedSymbol, unboundService.Key);
+      
+      // We need to add this type to any collection declarations that may already exist
+      var immutableArrayType = typeof(ImmutableArray<>).GetInstantiatedGeneric(compilation, superclass);
+      if (!_services.TryGetValue(immutableArrayType, out var immutableArrayServices)) continue;
+
+      foreach (var service in immutableArrayServices) {
+        service.CollectedServices?.Add(selectedService);
+      }
     }
     CheckConstructorDependencies(selectedService, compilation);
       
