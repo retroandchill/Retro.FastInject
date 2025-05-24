@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.ServiceHierarchy;
@@ -17,12 +18,212 @@ public class ServiceManifestTest {
   private readonly ImmutableArray<Type> _references = [
       typeof(object),
       typeof(ServiceScope),
-      typeof(FromKeyedServicesAttribute)
+      typeof(FromKeyedServicesAttribute),
+      typeof(Logger<>)
   ];
 
   [SetUp]
   public void Setup() {
     _manifest = new ServiceManifest();
+  }
+
+  [Test]
+  public void CheckConstructorDependencies_UnboundGenericService_SpecializesCorrectly() {
+    // Create a generic service class and a consumer that depends on it
+    const string code = """
+                        using System.Collections.Generic;
+
+                        namespace Test {
+                          public class GenericService<T> {
+                            public T Value { get; set; }
+                          }
+                          
+                          public class Consumer {
+                            public Consumer(GenericService<string> service) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var consumerType = compilation.GetTypeSymbol("Test.Consumer");
+    var genericServiceType = compilation.GetTypeSymbol("Test.GenericService`1");
+
+    // Register the open generic
+    _manifest.AddService(genericServiceType, ServiceScope.Singleton);
+
+    // Arrange
+    var registration = new ServiceRegistration { Type = consumerType };
+
+    // Act & Assert - should resolve GenericService<string> from open generic registration
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+
+    // Verify the constructor resolution
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
+                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
+
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(), Is.EqualTo("Test.GenericService<string>"));
+  }
+
+  [Test]
+  public void CheckConstructorDependencies_MultipleGenericSpecializations_ResolveCorrectly() {
+    // Create a generic service with multiple specializations
+    const string code = """
+                        namespace Test {
+                          public interface IGenericRepo<T> { }
+                          
+                          public class GenericRepo<T> : IGenericRepo<T> { }
+                          
+                          public class StringConsumer {
+                            public StringConsumer(IGenericRepo<string> repo) { }
+                          }
+                          
+                          public class IntConsumer {
+                            public IntConsumer(IGenericRepo<int> repo) { }
+                          }
+                          
+                          public class MultiConsumer {
+                            public MultiConsumer(IGenericRepo<string> stringRepo, IGenericRepo<int> intRepo) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var stringConsumerType = compilation.GetTypeSymbol("Test.StringConsumer");
+    var intConsumerType = compilation.GetTypeSymbol("Test.IntConsumer");
+    var multiConsumerType = compilation.GetTypeSymbol("Test.MultiConsumer");
+    var genericRepoType = compilation.GetTypeSymbol("Test.GenericRepo`1");
+    var genericRepoInterfaceType = compilation.GetTypeSymbol("Test.IGenericRepo`1");
+
+    // Register the generic repository
+    _manifest.AddService(genericRepoType, ServiceScope.Singleton);
+    _manifest.AddService(genericRepoInterfaceType, ServiceScope.Singleton, genericRepoType);
+
+    // Register and validate consumers
+    var stringConsumerRegistration = new ServiceRegistration { Type = stringConsumerType };
+    var intConsumerRegistration = new ServiceRegistration { Type = intConsumerType };
+    var multiConsumerRegistration = new ServiceRegistration { Type = multiConsumerType };
+
+    // All should resolve without errors
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(stringConsumerRegistration, compilation));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(intConsumerRegistration, compilation));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(multiConsumerRegistration, compilation));
+
+    // Verify the correct specializations in multi consumer
+    var multiResolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
+                                                                                      SymbolEqualityComparer.Default.Equals(r.Type, multiConsumerType));
+
+    Assert.That(multiResolution, Is.Not.Null);
+    Assert.That(multiResolution.Parameters, Has.Count.EqualTo(2));
+    Assert.Multiple(() => {
+      Assert.That(multiResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IGenericRepo<string>"));
+      Assert.That(multiResolution.Parameters[1].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IGenericRepo<int>"));
+    });
+  }
+
+  [Test]
+  public void CheckConstructorDependencies_ComplexGenericStructure_SpecializesCorrectly() {
+    // Create a nested generic structure to test
+    const string code = """
+                        using System.Collections.Generic;
+
+                        namespace Test {
+                          public interface IRepository<T> { }
+                          
+                          public class Repository<T> : IRepository<T> { }
+                          
+                          public interface IService<TRepo, TEntity> where TRepo : IRepository<TEntity> { }
+                          
+                          public class Service<TRepo, TEntity> : IService<TRepo, TEntity> where TRepo : IRepository<TEntity> { }
+                          
+                          public class User { }
+                          
+                          public class ComplexConsumer {
+                            public ComplexConsumer(IService<IRepository<User>, User> userService) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var consumerType = compilation.GetTypeSymbol("Test.ComplexConsumer");
+    var repositoryType = compilation.GetTypeSymbol("Test.Repository`1");
+    var repositoryInterfaceType = compilation.GetTypeSymbol("Test.IRepository`1");
+    var serviceType = compilation.GetTypeSymbol("Test.Service`2");
+    var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService`2");
+
+    // Register open generics
+    _manifest.AddService(repositoryType, ServiceScope.Singleton);
+    _manifest.AddService(repositoryInterfaceType, ServiceScope.Singleton, repositoryType);
+    _manifest.AddService(serviceType, ServiceScope.Singleton);
+    _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, serviceType);
+
+    // Arrange
+    var registration = new ServiceRegistration { Type = consumerType };
+
+    // Act & Assert - should resolve the complex generic structure
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+
+    // Verify the constructor resolution
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
+                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
+
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(),
+                Is.EqualTo("Test.IService<Test.IRepository<Test.User>, Test.User>"));
+  }
+
+  [Test]
+  public void CheckConstructorDependencies_GenericMethodDependency_ResolvesCorrectly() {
+    // Create a class with a generic factory method that needs to be specialized
+    const string code = """
+                        namespace Test {
+                          public class Item { }
+                          
+                          public class Consumer {
+                            public Consumer(Factory<Item> factory) { }
+                          }
+                          
+                          public class Factory<T> {
+                            public T Create() => default;
+                          }
+                          
+                          public static class GenericFactory {
+                            public static Factory<T> CreateFactory<T>() {
+                              return new Factory<T>();
+                            }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var consumerType = compilation.GetTypeSymbol("Test.Consumer");
+    var factoryType = compilation.GetTypeSymbol("Test.Factory`1");
+    var factoryMethod = compilation.GetMethodSymbol("Test.GenericFactory", "CreateFactory");
+
+    // Register the factory type with the generic factory method
+    _manifest.AddService(factoryType, ServiceScope.Singleton, associatedSymbol: factoryMethod);
+
+    // Arrange
+    var registration = new ServiceRegistration { Type = consumerType };
+
+    // Act & Assert - should resolve the factory with the correct type argument
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+
+    // Verify the constructor resolution
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
+                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
+
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(), Is.EqualTo("Test.Factory<Test.Item>"));
   }
 
   [Test]

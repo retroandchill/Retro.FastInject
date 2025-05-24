@@ -140,17 +140,17 @@ public class ServiceManifest {
         parameterResolution.MultipleServices = registrations.ToList();
         selectedService = null;
       }
-      
+
       if (selectedService is not null) {
         selectedService = ResolveConcreteType(selectedService);
       }
-  
+      
       canResolve = selectedService != null;
     } else {
       // Check if the type is a collection type
       if (keyName is null && paramType is INamedTypeSymbol { IsGenericType: true } namedType 
-                          && CanResolveGenericType(namedType, compilation, parameterResolution.Parameter,
-                                                   ref selectedService)) {
+                          && CanResolveGenericType(namedType, compilation, parameterResolution,
+                                                   keyName, ref selectedService)) {
         return true;
       }
       parameterResolution.HasNoDeclaration = true;
@@ -160,24 +160,55 @@ public class ServiceManifest {
   }
 
   private bool CanResolveGenericType(INamedTypeSymbol namedType, Compilation compilation, 
-                                     IParameterSymbol targetParameter,
+                                     ParameterResolution targetParameter,
+                                     string? keyName,
                                      ref ServiceRegistration? selectedService) {
     var genericTypeName = namedType.ConstructedFrom.ToDisplayString();
-    if (genericTypeName is not ("System.Collections.Generic.IEnumerable<T>" or
+    if (genericTypeName is "System.Collections.Generic.IEnumerable<T>" or
         "System.Collections.Generic.IReadOnlyCollection<T>" or
         "System.Collections.Generic.IReadOnlyList<T>" or
-        "System.Collections.Immutable.ImmutableArray<T>")) return false;
-    
+        "System.Collections.Immutable.ImmutableArray<T>") {
+      return TryResolveServiceCollection(namedType, compilation, targetParameter.Parameter, out selectedService);
+    }
+
+    if (!_services.TryGetValue(namedType.ConstructedFrom, out var registrations)) {
+      return false;
+    }
+
+    ServiceRegistration? unboundService = null;
+    try {
+      unboundService = registrations.SingleOrDefault(r => keyName is null || r.Key == keyName);
+    } catch (InvalidOperationException) {
+      targetParameter.HasMultipleRegistrations = true;
+      targetParameter.MultipleServices = registrations.ToList();
+    }
+
+    if (unboundService is null) return false;
+
+    var concreteUnbound = ResolveConcreteType(unboundService);
+    var implementationType = concreteUnbound.Type.GetInstantiatedGeneric(namedType.TypeArguments.ToArray());
+      
+    selectedService = AddService(implementationType, unboundService.Lifetime, key: unboundService.Key, associatedSymbol: unboundService.AssociatedSymbol);
+    foreach (var superclass in implementationType.GetAllSuperclasses()
+                 .Where(x => !x.IsSpecialInjectableType() && !x.Equals(implementationType, SymbolEqualityComparer.Default))) {
+      AddService(superclass, unboundService.Lifetime, implementationType, unboundService.AssociatedSymbol, unboundService.Key);
+    }
+    CheckConstructorDependencies(selectedService, compilation);
+      
+    return true;
+  }
+  private bool TryResolveServiceCollection(INamedTypeSymbol namedType, Compilation compilation, IParameterSymbol targetParameter, out ServiceRegistration? selectedService) {
     var elementType = namedType.TypeArguments[0];
     if (!_services.TryGetValue(elementType, out var elementServices)) {
       elementServices = [];
     }
-    
+
     var requireNonEmptyAttribute = targetParameter.GetAttribute<RequireNonEmptyAttribute>();
     if (requireNonEmptyAttribute is not null && elementServices.Count == 0) {
+      selectedService = null;
       return false;
     }
-      
+
     var immutableArrayType = typeof(ImmutableArray<>).GetInstantiatedGeneric(compilation, elementType);
     AddService(immutableArrayType, ServiceScope.Transient);
     var readOnlyListType = typeof(IReadOnlyList<>).GetInstantiatedGeneric(compilation, elementType);
@@ -185,11 +216,10 @@ public class ServiceManifest {
     var readOnlyCollectionType = typeof(IReadOnlyCollection<>).GetInstantiatedGeneric(compilation, elementType);
     AddService(readOnlyCollectionType, ServiceScope.Transient, immutableArrayType);
     var enumerableType = typeof(IEnumerable<>).GetInstantiatedGeneric(compilation, elementType);
-    AddService(enumerableType, ServiceScope.Transient, immutableArrayType,
-        collectedServices: elementServices
-            .Select(ResolveConcreteType)
-            .ToList());
-    selectedService = _services[immutableArrayType][0];
+    selectedService = AddService(enumerableType, ServiceScope.Transient, immutableArrayType,
+                              collectedServices: elementServices
+                                  .Select(ResolveConcreteType)
+                                  .ToList());
     return true;
   }
 
@@ -252,14 +282,14 @@ public class ServiceManifest {
   /// <param name="associatedSymbol">An optional symbol associated with the service.</param>
   /// <param name="key">An optional key to differentiate services of the same type.</param>
   /// <param name="collectedServices">The list of services that this is a collection of</param>
-  public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null,
-                         ISymbol? associatedSymbol = null, string? key = null, List<ServiceRegistration>? collectedServices = null) {
+  public ServiceRegistration AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null,
+                                        ISymbol? associatedSymbol = null, string? key = null, List<ServiceRegistration>? collectedServices = null) {
     if (!_services.TryGetValue(serviceType, out var registrations)) {
       registrations = [];
       _services[serviceType] = registrations;
     }
 
-    registrations.Add(new ServiceRegistration {
+    var registration = new ServiceRegistration {
         Type = serviceType,
         Key = key,
         Lifetime = lifetime,
@@ -267,12 +297,17 @@ public class ServiceManifest {
             implementationType is null || implementationType.Equals(serviceType, SymbolEqualityComparer.Default)
                 ? null
                 : implementationType,
-        IndexForType = registrations.Count,
+        IndexForType = registrations
+            .Count(x => x.ImplementationType is not INamedTypeSymbol { IsGenericType: true } namedType 
+                        || !namedType.TypeArguments.Any(y => y is ITypeParameterSymbol)),
         AssociatedSymbol = associatedSymbol,
         CollectedServices = collectedServices,
         IsDisposable = serviceType.AllInterfaces.Any(i => i.IsOfType<IDisposable>()),
         IsAsyncDisposable = serviceType.AllInterfaces.Any(i => i.ToDisplayString() == "System.IAsyncDisposable")
-    });
+    };
+    registrations.Add(registration);
+
+    return registration;
   }
 
   /// <summary>
@@ -283,7 +318,8 @@ public class ServiceManifest {
   /// </returns>
   public IEnumerable<ServiceRegistration> GetAllServices() {
     return _services.Values
-        .SelectMany(list => list);
+        .SelectMany(list => list.Where(x => x.ResolvedType is not INamedTypeSymbol { IsGenericType: true } generic ||
+                                            generic.TypeArguments.All(y => y is not ITypeParameterSymbol)));
   }
 
   /// <summary>
@@ -292,8 +328,6 @@ public class ServiceManifest {
   /// <param name="lifetime">The desired service lifetime for filtering the service registrations.</param>
   /// <returns>An enumerable collection of service registrations matching the specified lifetime.</returns>
   public IEnumerable<ServiceRegistration> GetServicesByLifetime(ServiceScope lifetime) {
-    return _services.Values
-        .SelectMany(list => list)
-        .Where(reg => reg.Lifetime == lifetime);
+    return GetAllServices().Where(reg => reg.Lifetime == lifetime);
   }
 }

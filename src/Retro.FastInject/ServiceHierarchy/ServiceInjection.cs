@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Utils;
 
 namespace Retro.FastInject.ServiceHierarchy;
 
@@ -29,7 +30,7 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// <c>Name</c> property of the <see cref="ITypeSymbol"/> specified during the registration
   /// process.
   /// </remarks>
-  public string ServiceName { get; } = registration.Type.Name;
+  public string ServiceName { get; } = registration.Type.GetSanitizedTypeName();
 
   /// <summary>
   /// Gets the name of the field used for storing the service during dependency injection.

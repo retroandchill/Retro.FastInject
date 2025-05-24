@@ -237,5 +237,42 @@ public static class TypeExtensions {
     // Construct the generic type with the provided element type(s)
     return genericType.Construct(elementTypes);
   }
+
+  /// <summary>
+  /// Constructs an instantiated generic type from the provided unbound generic type and type arguments.
+  /// </summary>
+  /// <param name="type">The unbound generic type represented by an <see cref="ITypeSymbol"/>.</param>
+  /// <param name="elementTypes">An array of <see cref="ITypeSymbol"/> representing the generic type arguments.</param>
+  /// <returns>
+  /// An <see cref="INamedTypeSymbol"/> representing the constructed generic type with the provided type arguments.
+  /// </returns>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown if the provided type is not an unbound generic type or if the type cannot be constructed with the provided type arguments.
+  /// </exception>
+  public static INamedTypeSymbol GetInstantiatedGeneric(this ITypeSymbol type, params ITypeSymbol[] elementTypes) {
+    if (type is not INamedTypeSymbol namedType) {
+      throw new InvalidOperationException($"Type '{type.ToDisplayString()}' is not an unbound generic.");
+    }
+    
+    // Construct the generic type with the provided element type(s)
+    return namedType.Construct(elementTypes);
+  }
+
+  /// <summary>
+  /// Generates a sanitized string representation of the given <see cref="ITypeSymbol"/>.
+  /// For generic types, the result includes a concatenated format of the type's name and its type arguments.
+  /// </summary>
+  /// <param name="type">The <see cref="ITypeSymbol"/> to generate a sanitized name for.</param>
+  /// <returns>
+  /// A sanitized string representation of the type, formatted as the type name. For generic types,
+  /// the type arguments are included as an underscore-separated list.
+  /// </returns>
+  public static string GetSanitizedTypeName(this ITypeSymbol type) {
+    return type is not INamedTypeSymbol { IsGenericType: true } namedType ? type.Name 
+        : $"{type.Name}_{namedType.TypeArguments
+            .Select(x => x.GetSanitizedTypeName())
+            .Joining("_")}";
+
+  }
   
 }
