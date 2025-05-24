@@ -175,11 +175,10 @@ public class ServiceManifest {
     var readOnlyCollectionType = typeof(IReadOnlyCollection<>).GetInstantiatedGeneric(compilation, elementType);
     AddService(readOnlyCollectionType, ServiceScope.Transient, immutableArrayType);
     var enumerableType = typeof(IEnumerable<>).GetInstantiatedGeneric(compilation, elementType);
-    AddService(enumerableType, ServiceScope.Transient, immutableArrayType);
-    selectedService = _services[immutableArrayType][0];
-    selectedService.CollectedServices = elementServices
-        .Select(ResolveConcreteType)
-        .ToList();
+    AddService(enumerableType, ServiceScope.Transient, immutableArrayType,
+        collectedServices: elementServices
+            .Select(ResolveConcreteType)
+            .ToList());
     return true;
   }
 
@@ -242,7 +241,7 @@ public class ServiceManifest {
   /// <param name="associatedSymbol">An optional symbol associated with the service.</param>
   /// <param name="key">An optional key to differentiate services of the same type.</param>
   public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null,
-                         ISymbol? associatedSymbol = null, string? key = null) {
+                         ISymbol? associatedSymbol = null, string? key = null, List<ServiceRegistration>? collectedServices = null) {
     if (!_services.TryGetValue(serviceType, out var registrations)) {
       registrations = [];
       _services[serviceType] = registrations;
@@ -258,6 +257,7 @@ public class ServiceManifest {
                 : implementationType,
         IndexForType = registrations.Count,
         AssociatedSymbol = associatedSymbol,
+        CollectedServices = collectedServices,
         IsDisposable = serviceType.AllInterfaces.Any(i => i.IsOfType<IDisposable>()),
         IsAsyncDisposable = serviceType.AllInterfaces.Any(i => i.ToDisplayString() == "System.IAsyncDisposable")
     });

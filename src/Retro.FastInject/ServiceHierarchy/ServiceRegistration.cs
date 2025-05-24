@@ -60,7 +60,7 @@ public record ServiceRegistration {
   /// allowing aggregation of individual service registrations under a single parent.
   /// Each element in the list corresponds to a specific service registration.
   /// If the service registration does not represent a collection, this property may be null.
-  public List<ServiceRegistration>? CollectedServices { get; }
+  public List<ServiceRegistration>? CollectedServices { get; init; }
 
   /// Represents the index of the specific type registration within the list of registrations for the same service type.
   /// This property is automatically assigned when a service is registered and reflects the order in which
