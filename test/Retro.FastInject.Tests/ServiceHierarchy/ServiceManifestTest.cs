@@ -549,6 +549,84 @@ public class ServiceManifestTest {
   }
   
   [Test]
+  public void CheckConstructorDependencies_WithKeyedService_WrongKeyName_ThrowsInvalidOperationException() {
+    // Create interface with implementation registered under a specific key
+    const string code = """
+                        using Retro.FastInject.Annotations;
+                        using Microsoft.Extensions.DependencyInjection;
+                        
+                        namespace Test {
+                          public interface IKeyedService { }
+                          
+                          public class KeyedServiceImpl : IKeyedService { }
+                          
+                          public class WrongKeyConsumer {
+                            public WrongKeyConsumer([FromKeyedServices("wrongKey")] IKeyedService service) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.WrongKeyConsumer");
+    var interfaceType = compilation.GetTypeSymbol("Test.IKeyedService");
+    var implType = compilation.GetTypeSymbol("Test.KeyedServiceImpl");
+  
+    // Register implementation with a different key than what's requested
+    _manifest.AddService(implType, ServiceScope.Singleton);
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, implType, key: "correctKey");
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should fail because the wrong key is requested
+    var ex = Assert.Throws<InvalidOperationException>(() => 
+        _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
+    Assert.That(ex?.Message, Contains.Substring("with key 'wrongKey'"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithKeyedService_RequestNonKeyedService_ThrowsInvalidOperationException() {
+    // Create service registered without a key but requested with one
+    const string code = """
+                        using Retro.FastInject.Annotations;
+                        using Microsoft.Extensions.DependencyInjection;
+                        
+                        namespace Test {
+                          public interface INonKeyedService { }
+                          
+                          public class NonKeyedServiceImpl : INonKeyedService { }
+                          
+                          public class KeyRequestingConsumer {
+                            public KeyRequestingConsumer([FromKeyedServices("someKey")] INonKeyedService service) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.KeyRequestingConsumer");
+    var interfaceType = compilation.GetTypeSymbol("Test.INonKeyedService");
+    var implType = compilation.GetTypeSymbol("Test.NonKeyedServiceImpl");
+  
+    // Register implementation without a key
+    _manifest.AddService(implType, ServiceScope.Singleton);
+    _manifest.AddService(interfaceType, ServiceScope.Singleton, implType); // No key specified
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should fail because we're requesting a keyed service but it's registered without a key
+    var ex = Assert.Throws<InvalidOperationException>(() => 
+        _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
+    Assert.That(ex?.Message, Contains.Substring("with key 'someKey'"));
+  }
+  
+  [Test]
   public void CheckConstructorDependencies_WithMultipleServices_NoKey_ThrowsInvalidOperationException() {
     // Create interface with multiple implementations
     const string code = """
