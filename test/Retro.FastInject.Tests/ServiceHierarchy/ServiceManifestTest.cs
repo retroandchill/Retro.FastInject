@@ -387,6 +387,89 @@ public class ServiceManifestTest {
   }
 
   [Test]
+  public void ValidateDependencyGraph_WithCircularDependency_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency: A → B → C → A
+    const string code = """
+                        namespace Test {
+                          public class ServiceA {
+                            public ServiceA(ServiceB b) { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceC c) { }
+                          }
+                          
+                          public class ServiceC {
+                            public ServiceC(ServiceA a) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceCType = compilation.GetTypeSymbol("Test.ServiceC");
+
+    // Register services in the manifest
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+    var regC = _manifest.AddService(serviceCType, ServiceScope.Singleton);
+
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+    _manifest.CheckConstructorDependencies(regC, compilation);
+
+    // Act & Assert
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
+
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
+    Assert.That(exception.Message, Does.Contain("ServiceA"));
+    Assert.That(exception.Message, Does.Contain("ServiceB"));
+    Assert.That(exception.Message, Does.Contain("ServiceC"));
+    Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
+  }
+
+  [Test]
+  public void ValidateDependencyGraph_WithValidDependencies_Succeeds() {
+    // Create a class structure with valid dependencies: A → B → C (no cycles)
+    const string code = """
+                        namespace Test {
+                          public class ServiceC { 
+                            public ServiceC() { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceC c) { }
+                          }
+                          
+                          public class ServiceA {
+                            public ServiceA(ServiceB b) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceCType = compilation.GetTypeSymbol("Test.ServiceC");
+
+    // Register services in the manifest
+    var regC = _manifest.AddService(serviceCType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regC, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+    _manifest.CheckConstructorDependencies(regA, compilation);
+
+    // Act & Assert - should not throw an exception
+    Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
+  }
+
+  [Test]
   public void CheckConstructorDependencies_WithNullableDependency_Succeeds() {
     // Create a class with nullable dependency
     const string code = """
@@ -1037,5 +1120,74 @@ public class ServiceManifestTest {
       Assert.That(paramResolution.SelectedService.Lifetime, Is.EqualTo(ServiceScope.Singleton));
       Assert.That(SymbolEqualityComparer.Default.Equals(paramResolution.SelectedService.Type, singletonType), Is.True);
     });
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithInterfacePlugins_ResolveCorrectCollection() {
+    // Create a test with interface-based plugins and collection injection
+    const string code = """
+                        using System.Collections.Immutable;
+  
+                        namespace Test {
+                          public interface IBasePlugin {}
+                        
+                          public class GenericPlugin<T> : IBasePlugin { }
+                          
+                          public class ConcretePlugin : IBasePlugin { }
+                          
+                          // This consumer expects ALL IBasePlugin implementations
+                          public class CollectionConsumer {
+                            public CollectionConsumer(ImmutableArray<IBasePlugin> plugins) { }
+                          }
+                          
+                          public class StringConsumer {
+                            public StringConsumer(GenericPlugin<string> plugin) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    
+    // Get all type symbols
+    var basePluginType = compilation.GetTypeSymbol("Test.IBasePlugin");
+    var genericPluginType = compilation.GetTypeSymbol("Test.GenericPlugin`1");
+    var concretePluginType = compilation.GetTypeSymbol("Test.ConcretePlugin");
+    var collectionConsumerType = compilation.GetTypeSymbol("Test.CollectionConsumer");
+    var stringConsumerType = compilation.GetTypeSymbol("Test.StringConsumer");
+    
+    // Step 1: Register all the plugins
+    // Register concrete plugin
+    _manifest.AddService(concretePluginType, ServiceScope.Singleton);
+    _manifest.AddService(basePluginType, ServiceScope.Singleton, concretePluginType);
+    
+    // Register generic plugin
+    _manifest.AddService(genericPluginType, ServiceScope.Singleton);
+    _manifest.AddService(basePluginType, ServiceScope.Singleton, genericPluginType);
+    
+    // Step 2: Register and resolve consumers
+    var collectionConsumerReg = new ServiceRegistration { Type = collectionConsumerType };
+    var stringConsumerReg = new ServiceRegistration { Type = stringConsumerType };
+    
+    // Resolve dependencies for both consumers
+    _manifest.CheckConstructorDependencies(collectionConsumerReg, compilation);
+    _manifest.CheckConstructorDependencies(stringConsumerReg, compilation);
+    
+    // Step 3: Verify that StringConsumer resolved its dependency correctly
+    var stringResolution = _manifest.GetAllConstructorResolutions()
+        .First(r => SymbolEqualityComparer.Default.Equals(r.Type, stringConsumerType));
+    
+    Assert.That(stringResolution.Parameters, Has.Count.EqualTo(1));
+    Assert.That(stringResolution.Parameters[0].Parameter.Type.ToDisplayString(), 
+        Is.EqualTo("Test.GenericPlugin<string>"));
+    
+    // Step 4: Verify that CollectionConsumer has a collection with both plugins
+    var collectionResolution = _manifest.GetAllConstructorResolutions()
+        .First(r => SymbolEqualityComparer.Default.Equals(r.Type, collectionConsumerType));
+    
+    Assert.That(collectionResolution.Parameters, Has.Count.EqualTo(1));
+    
+    var collectedServices = collectionResolution.Parameters[0].SelectedService?.CollectedServices;
+    Assert.That(collectedServices, Is.Not.Null);
+    Assert.That(collectedServices, Has.Count.EqualTo(2), "Collection should contain exactly 2 plugins");
   }
 }
