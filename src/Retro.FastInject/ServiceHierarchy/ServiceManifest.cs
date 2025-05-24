@@ -136,10 +136,10 @@ public class ServiceManifest {
     var path = new Stack<ITypeSymbol>();
     var onPath = new HashSet<ITypeSymbol>(TypeSymbolEqualityComparer.Instance);
     
-    foreach (var service in GetAllServices()) {
-      if (visited.Contains(service.Type)) continue;
+    foreach (var serviceType in GetAllServices().Select(x => x.Type)) {
+      if (visited.Contains(serviceType)) continue;
 
-      if (DetectCycle(service.Type, visited, path, onPath, out var cycle)) {
+      if (DetectCycle(serviceType, visited, path, onPath, out var cycle)) {
         throw new InvalidOperationException(
             $"Detected circular dependency: {string.Join(" → ", cycle.Select(t => t.ToDisplayString()))}");
       }
@@ -152,23 +152,7 @@ public class ServiceManifest {
     
     
     if (onPath.Contains(type)) {
-      // We found a cycle
-      cycle = [];
-      var cycleStarted = false;
-      
-      // Extract the cycle from the path
-      foreach (var node in path.Reverse()) {
-        if (TypeSymbolEqualityComparer.Instance.Equals(node, type)) {
-          cycleStarted = true;
-        }
-        
-        if (cycleStarted) {
-          cycle.Add(node);
-        }
-      }
-      
-      cycle.Add(type); // Complete the cycle
-      return true;
+      return ExtractCycleFromPath(type, path, out cycle);
     }
     
     if (!visited.Add(type)) {
@@ -180,27 +164,54 @@ public class ServiceManifest {
     
     // If we have a constructor resolution for this type, check its dependencies
     if (_constructorResolutions.TryGetValue(type, out var resolution)) {
-      foreach (var param in resolution.Parameters
-                   .Select(param => new {
-                       param,
-                       isNullable = param.Parameter.Type.NullableAnnotation == NullableAnnotation.Annotated
-                   })
-                   .Where(t => !t.isNullable && t.param.DefaultValue == null)
-                   .Select(t => t.param)) {
-        // Check the selected service type if available
-        if (param.SelectedService == null) continue;
-
-        var serviceType = param.SelectedService.ResolvedType;
-        if (DetectCycle(serviceType, visited, path, onPath, out cycle)) {
-          return true;
-        }
-      }
+      if (CheckServiceCycle(visited, path, onPath, ref cycle, resolution)) return true;
     }
     
     // Done with this node
     path.Pop();
     onPath.Remove(type);
     return false;
+  }
+  private bool CheckServiceCycle(HashSet<ITypeSymbol> visited, 
+                                 Stack<ITypeSymbol> path, 
+                                 HashSet<ITypeSymbol> onPath, 
+                                 [NotNullWhen(true)] ref List<ITypeSymbol>? cycle, 
+                                 ConstructorResolution resolution) {
+    foreach (var serviceRegistration in resolution.Parameters
+                 .Select(param => new {
+                     param,
+                     isNullable = param.Parameter.Type.NullableAnnotation == NullableAnnotation.Annotated
+                 })
+                 .Where(t => !t.isNullable && t.param.DefaultValue == null)
+                 .Select(t => t.param.SelectedService)) {
+      // Check the selected service type if available
+      if (serviceRegistration is null) continue;
+
+      var serviceType = serviceRegistration.ResolvedType;
+      if (DetectCycle(serviceType, visited, path, onPath, out cycle)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  private static bool ExtractCycleFromPath(ITypeSymbol type, Stack<ITypeSymbol> path, out List<ITypeSymbol> cycle) {
+    // We found a cycle
+    cycle = [];
+    var cycleStarted = false;
+      
+    // Extract the cycle from the path
+    foreach (var node in path.Reverse()) {
+      if (TypeSymbolEqualityComparer.Instance.Equals(node, type)) {
+        cycleStarted = true;
+      }
+        
+      if (cycleStarted) {
+        cycle.Add(node);
+      }
+    }
+      
+    cycle.Add(type); // Complete the cycle
+    return true;
   }
 
   private bool CanResolve(string? keyName, ITypeSymbol paramType, ParameterResolution parameterResolution,
