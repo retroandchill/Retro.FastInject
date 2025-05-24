@@ -212,9 +212,9 @@ public static class TypeExtensions {
   }
 
   /// <summary>
-  /// Constructs a generic type by instantiating it with the specified <paramref name="elementType"/>.
+  /// Constructs a generic type by instantiating it with the specified <paramref name="elementTypes"/>.
   /// </summary>
-  /// <param name="elementType">The type to be used as the generic type argument for the constructed type.</param>
+  /// <param name="elementTypes">The types to be used as the generic type argument for the constructed type.</param>
   /// <param name="compilation">The current Roslyn <see cref="Compilation"/> instance used to access type metadata.</param>
   /// <param name="type">The generic type definition to be instantiated, provided as a <see cref="Type"/>.</param>
   /// <returns>

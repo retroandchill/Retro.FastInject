@@ -203,5 +203,13 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// </remarks>
   public int Index { get; } = registration.IndexForType;
 
+  /// <summary>
+  /// Determines whether the current service injection is the primary service for its type.
+  /// </summary>
+  /// <remarks>
+  /// This property evaluates whether the current service instance is the primary one
+  /// among all registered services of the same type, based on its index. A service is
+  /// considered primary if its <see cref="ServiceRegistration.IndexForType"/> is zero.
+  /// </remarks>
   public bool IsPrimary => Index == 0;
 }

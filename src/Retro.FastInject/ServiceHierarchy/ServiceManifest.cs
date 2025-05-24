@@ -251,6 +251,7 @@ public class ServiceManifest {
   /// <param name="implementationType">The implementation type of the service. Defaults to null if the implementation type is the same as the service type.</param>
   /// <param name="associatedSymbol">An optional symbol associated with the service.</param>
   /// <param name="key">An optional key to differentiate services of the same type.</param>
+  /// <param name="collectedServices">The list of services that this is a collection of</param>
   public void AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null,
                          ISymbol? associatedSymbol = null, string? key = null, List<ServiceRegistration>? collectedServices = null) {
     if (!_services.TryGetValue(serviceType, out var registrations)) {
