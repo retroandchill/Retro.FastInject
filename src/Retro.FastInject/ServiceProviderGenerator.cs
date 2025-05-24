@@ -72,7 +72,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
 
     var manifest = classSymbol.GenerateManifest();
 
-    // Validate constructor dependencies for all service implementations
+    // First, resolve all constructor dependencies for all service implementations
     var explicitServices = manifest.GetAllServices().ToList();
     foreach (var service in explicitServices) {
       try {
@@ -91,6 +91,25 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                  ));
       }
     }
+    
+    // After resolving all dependencies, validate the dependency graph for cycles
+    try {
+      manifest.ValidateDependencyGraph();
+    } catch (InvalidOperationException ex) {
+      context.ReportDiagnostic(Diagnostic.Create(
+                                 new DiagnosticDescriptor(
+                                     "FastInject003",
+                                     "Circular Dependency Error",
+                                     ex.Message,
+                                     "DependencyInjection",
+                                     DiagnosticSeverity.Error,
+                                     true
+                                 ),
+                                 classSymbol.Locations.FirstOrDefault()
+                             ));
+    }
+    
+    
 
     // Prepare constructor resolution information for template
     var constructorResolutions = manifest.GetAllConstructorResolutions()

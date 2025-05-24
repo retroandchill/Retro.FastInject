@@ -4,7 +4,9 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moq;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.ServiceHierarchy;
 using Retro.FastInject.Tests.Utils;
@@ -384,6 +386,89 @@ public class ServiceManifestTest {
 
     // Act & Assert
     Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+  }
+
+  [Test]
+  public void ValidateDependencyGraph_WithCircularDependency_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency: A → B → C → A
+    const string code = """
+                        namespace Test {
+                          public class ServiceA {
+                            public ServiceA(ServiceB b) { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceC c) { }
+                          }
+                          
+                          public class ServiceC {
+                            public ServiceC(ServiceA a) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceCType = compilation.GetTypeSymbol("Test.ServiceC");
+
+    // Register services in the manifest
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+    var regC = _manifest.AddService(serviceCType, ServiceScope.Singleton);
+
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+    _manifest.CheckConstructorDependencies(regC, compilation);
+
+    // Act & Assert
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
+
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
+    Assert.That(exception.Message, Does.Contain("ServiceA"));
+    Assert.That(exception.Message, Does.Contain("ServiceB"));
+    Assert.That(exception.Message, Does.Contain("ServiceC"));
+    Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
+  }
+
+  [Test]
+  public void ValidateDependencyGraph_WithValidDependencies_Succeeds() {
+    // Create a class structure with valid dependencies: A → B → C (no cycles)
+    const string code = """
+                        namespace Test {
+                          public class ServiceC { 
+                            public ServiceC() { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceC c) { }
+                          }
+                          
+                          public class ServiceA {
+                            public ServiceA(ServiceB b) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceCType = compilation.GetTypeSymbol("Test.ServiceC");
+
+    // Register services in the manifest
+    var regC = _manifest.AddService(serviceCType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regC, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+    _manifest.CheckConstructorDependencies(regA, compilation);
+
+    // Act & Assert - should not throw an exception
+    Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
 
   [Test]

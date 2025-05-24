@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -95,7 +96,7 @@ public class ServiceManifest {
     }
 
     parameterResolution.Key = keyName;
-
+  
     var canResolve = CanResolve(keyName, paramType, parameterResolution, compilation, out var selectedService);
 
     parameterResolution.SelectedService = selectedService;
@@ -123,6 +124,83 @@ public class ServiceManifest {
     }
   
     missingDependencies.Add(dependency.ToString());
+  }
+
+  /// <summary>
+  /// Validates the entire dependency graph for circular dependencies.
+  /// This should be called after all constructor dependencies have been resolved.
+  /// </summary>
+  /// <exception cref="InvalidOperationException">Thrown when a circular dependency is detected.</exception>
+  public void ValidateDependencyGraph() {
+    var visited = new HashSet<ITypeSymbol>(TypeSymbolEqualityComparer.Instance);
+    var path = new Stack<ITypeSymbol>();
+    var onPath = new HashSet<ITypeSymbol>(TypeSymbolEqualityComparer.Instance);
+    
+    foreach (var service in GetAllServices()) {
+      if (visited.Contains(service.Type)) continue;
+
+      if (DetectCycle(service.Type, visited, path, onPath, out var cycle)) {
+        throw new InvalidOperationException(
+            $"Detected circular dependency: {string.Join(" → ", cycle.Select(t => t.ToDisplayString()))}");
+      }
+    }
+  }
+  
+  private bool DetectCycle(ITypeSymbol type, HashSet<ITypeSymbol> visited, Stack<ITypeSymbol> path, 
+                          HashSet<ITypeSymbol> onPath, [NotNullWhen(true)] out List<ITypeSymbol>? cycle) {
+    cycle = null;
+    
+    
+    if (onPath.Contains(type)) {
+      // We found a cycle
+      cycle = [];
+      var cycleStarted = false;
+      
+      // Extract the cycle from the path
+      foreach (var node in path.Reverse()) {
+        if (TypeSymbolEqualityComparer.Instance.Equals(node, type)) {
+          cycleStarted = true;
+        }
+        
+        if (cycleStarted) {
+          cycle.Add(node);
+        }
+      }
+      
+      cycle.Add(type); // Complete the cycle
+      return true;
+    }
+    
+    if (!visited.Add(type)) {
+      return false; // Already visited and no cycle found
+    }
+
+    onPath.Add(type);
+    path.Push(type);
+    
+    // If we have a constructor resolution for this type, check its dependencies
+    if (_constructorResolutions.TryGetValue(type, out var resolution)) {
+      foreach (var param in resolution.Parameters
+                   .Select(param => new {
+                       param,
+                       isNullable = param.Parameter.Type.NullableAnnotation == NullableAnnotation.Annotated
+                   })
+                   .Where(t => !t.isNullable && t.param.DefaultValue == null)
+                   .Select(t => t.param)) {
+        // Check the selected service type if available
+        if (param.SelectedService == null) continue;
+
+        var serviceType = param.SelectedService.ResolvedType;
+        if (DetectCycle(serviceType, visited, path, onPath, out cycle)) {
+          return true;
+        }
+      }
+    }
+    
+    // Done with this node
+    path.Pop();
+    onPath.Remove(type);
+    return false;
   }
 
   private bool CanResolve(string? keyName, ITypeSymbol paramType, ParameterResolution parameterResolution,
@@ -197,7 +275,8 @@ public class ServiceManifest {
       
     return true;
   }
-  private bool TryResolveServiceCollection(INamedTypeSymbol namedType, Compilation compilation, IParameterSymbol targetParameter, out ServiceRegistration? selectedService) {
+  private bool TryResolveServiceCollection(INamedTypeSymbol namedType, Compilation compilation, IParameterSymbol targetParameter, 
+                                           [NotNullWhen(true)] out ServiceRegistration? selectedService) {
     var elementType = namedType.TypeArguments[0];
     if (!_services.TryGetValue(elementType, out var elementServices)) {
       elementServices = [];
