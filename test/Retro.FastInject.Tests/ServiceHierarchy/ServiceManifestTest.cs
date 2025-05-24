@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -172,10 +173,12 @@ public class ServiceManifestTest {
 
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceType = compilation.GetTypeSymbol("Test.ServiceWithDependency");
+    var dependencyInterface = compilation.GetTypeSymbol("Test.IDependency");
     var dependencyType = compilation.GetTypeSymbol("Test.Dependency");
 
     // Register the dependency
     _manifest.AddService(dependencyType, ServiceScope.Singleton);
+    _manifest.AddService(dependencyInterface, ServiceScope.Singleton, dependencyType);
 
     // Arrange
     var registration = new ServiceRegistration { Type = serviceType };
@@ -234,5 +237,280 @@ public class ServiceManifestTest {
 
     // Act & Assert
     Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithIEnumerableDependency_Succeeds() {
+    // Create a class with an IEnumerable dependency
+    const string code = """
+                        using System.Collections.Generic;
+                        
+                        namespace Test {
+                          public interface IPlugin { }
+                          
+                          public class Plugin1 : IPlugin { }
+                          
+                          public class Plugin2 : IPlugin { }
+                          
+                          public class ServiceWithIEnumerable {
+                            public ServiceWithIEnumerable(IEnumerable<IPlugin> plugins) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithIEnumerable");
+    var pluginInterface = compilation.GetTypeSymbol("Test.IPlugin");
+    var plugin1Type = compilation.GetTypeSymbol("Test.Plugin1");
+    var plugin2Type = compilation.GetTypeSymbol("Test.Plugin2");
+  
+    // Register the plugin implementations
+    _manifest.AddService(plugin1Type, ServiceScope.Singleton);
+    _manifest.AddService(pluginInterface, ServiceScope.Singleton, plugin1Type);
+    _manifest.AddService(plugin2Type, ServiceScope.Singleton);
+    _manifest.AddService(pluginInterface, ServiceScope.Singleton, plugin2Type);
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+    
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(), 
+        Is.EqualTo("System.Collections.Generic.IEnumerable<Test.IPlugin>"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithIReadOnlyCollectionDependency_Succeeds() {
+    // Create a class with an IReadOnlyCollection dependency
+    const string code = """
+                        using System.Collections.Generic;
+                        
+                        namespace Test {
+                          public interface IStrategy { }
+                          
+                          public class StrategyA : IStrategy { }
+                          
+                          public class StrategyB : IStrategy { }
+                          
+                          public class ServiceWithReadOnlyCollection {
+                            public ServiceWithReadOnlyCollection(IReadOnlyCollection<IStrategy> strategies) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithReadOnlyCollection");
+    var strategyInterface = compilation.GetTypeSymbol("Test.IStrategy");
+    var strategyAType = compilation.GetTypeSymbol("Test.StrategyA");
+    var strategyBType = compilation.GetTypeSymbol("Test.StrategyB");
+  
+    // Register the strategy implementations
+    _manifest.AddService(strategyAType, ServiceScope.Singleton);
+    _manifest.AddService(strategyInterface, ServiceScope.Singleton, strategyAType);
+    _manifest.AddService(strategyBType, ServiceScope.Singleton);
+    _manifest.AddService(strategyInterface, ServiceScope.Singleton, strategyBType);
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+    
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(), 
+        Is.EqualTo("System.Collections.Generic.IReadOnlyCollection<Test.IStrategy>"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithIReadOnlyListDependency_Succeeds() {
+    // Create a class with an IReadOnlyList dependency
+    const string code = """
+                        using System.Collections.Generic;
+                        
+                        namespace Test {
+                          public interface IHandler { }
+                          
+                          public class HandlerOne : IHandler { }
+                          
+                          public class HandlerTwo : IHandler { }
+                          
+                          public class ServiceWithReadOnlyList {
+                            public ServiceWithReadOnlyList(IReadOnlyList<IHandler> handlers) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithReadOnlyList");
+    var handlerInterface = compilation.GetTypeSymbol("Test.IHandler");
+    var handler1Type = compilation.GetTypeSymbol("Test.HandlerOne");
+    var handler2Type = compilation.GetTypeSymbol("Test.HandlerTwo");
+  
+    // Register the handler implementations
+    _manifest.AddService(handler1Type, ServiceScope.Singleton);
+    _manifest.AddService(handlerInterface, ServiceScope.Singleton, handler1Type);
+    _manifest.AddService(handler2Type, ServiceScope.Singleton);
+    _manifest.AddService(handlerInterface, ServiceScope.Singleton, handler2Type);
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+    
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(), 
+        Is.EqualTo("System.Collections.Generic.IReadOnlyList<Test.IHandler>"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithImmutableArrayDependency_Succeeds() {
+    // Create a class with an ImmutableArray dependency
+    const string code = """
+                        using System.Collections.Immutable;
+                        
+                        namespace Test {
+                          public interface IValidator { }
+                          
+                          public class ValidatorA : IValidator { }
+                          
+                          public class ValidatorB : IValidator { }
+                          
+                          public class ServiceWithImmutableArray {
+                            public ServiceWithImmutableArray(ImmutableArray<IValidator> validators) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithImmutableArray");
+    var validatorInterface = compilation.GetTypeSymbol("Test.IValidator");
+    var validatorAType = compilation.GetTypeSymbol("Test.ValidatorA");
+    var validatorBType = compilation.GetTypeSymbol("Test.ValidatorB");
+  
+    // Register the validator implementations
+    _manifest.AddService(validatorAType, ServiceScope.Singleton);
+    _manifest.AddService(validatorInterface, ServiceScope.Singleton, validatorAType);
+    _manifest.AddService(validatorBType, ServiceScope.Singleton);
+    _manifest.AddService(validatorInterface, ServiceScope.Singleton, validatorBType);
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
+    
+    var paramResolution = resolution.Parameters[0];
+    Assert.That(paramResolution.Parameter.Type.ToDisplayString(), 
+        Is.EqualTo("System.Collections.Immutable.ImmutableArray<Test.IValidator>"));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithMultipleCollectionTypes_Succeeds() {
+    // Create a class with multiple collection type dependencies
+    const string code = """
+                        using System.Collections.Generic;
+                        using System.Collections.Immutable;
+                        
+                        namespace Test {
+                          public interface IFeature { }
+                          
+                          public class Feature1 : IFeature { }
+                          
+                          public class Feature2 : IFeature { }
+                          
+                          public class ServiceWithMultipleCollections {
+                            public ServiceWithMultipleCollections(
+                              IEnumerable<IFeature> allFeatures, 
+                              IReadOnlyCollection<IFeature> featureCollection,
+                              IReadOnlyList<IFeature> featureList,
+                              ImmutableArray<IFeature> featureArray) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithMultipleCollections");
+    var featureInterface = compilation.GetTypeSymbol("Test.IFeature");
+    var feature1Type = compilation.GetTypeSymbol("Test.Feature1");
+    var feature2Type = compilation.GetTypeSymbol("Test.Feature2");
+  
+    // Register the feature implementations
+    _manifest.AddService(feature1Type, ServiceScope.Singleton);
+    _manifest.AddService(featureInterface, ServiceScope.Singleton, feature1Type);
+    _manifest.AddService(feature2Type, ServiceScope.Singleton);
+    _manifest.AddService(featureInterface, ServiceScope.Singleton, feature2Type);
+  
+    // Arrange
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    // Verify that the constructor resolution has been stored
+    var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r => 
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+    
+    Assert.That(resolution, Is.Not.Null);
+    Assert.That(resolution.Parameters, Has.Count.EqualTo(4));
+  }
+  
+  [Test]
+  public void CheckConstructorDependencies_WithEmptyCollectionDependency_Fails() {
+    // Create a class with a collection dependency for which no implementations exist
+    const string code = """
+                        using System.Collections.Generic;
+                        
+                        namespace Test {
+                          public interface INotRegistered { }
+                          
+                          public class ServiceWithEmptyCollection {
+                            public ServiceWithEmptyCollection(IEnumerable<INotRegistered> items) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceType = compilation.GetTypeSymbol("Test.ServiceWithEmptyCollection");
+  
+    // Arrange (no implementations registered)
+    var registration = new ServiceRegistration { Type = serviceType };
+  
+    // Act & Assert
+    // This should fail because there are no implementations of INotRegistered
+    var ex = Assert.Throws<InvalidOperationException>(() => 
+        _manifest.CheckConstructorDependencies(registration, compilation));
+    
+    Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
   }
 }
