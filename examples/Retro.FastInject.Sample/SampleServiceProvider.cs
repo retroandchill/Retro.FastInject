@@ -21,5 +21,10 @@ public sealed partial class SampleServiceProvider(int value, float simpleValue) 
   private FactoryConstructedService CreateFactoryConstructedService() {
     return new FactoryConstructedService(value);
   }
+
+  [Factory]
+  private LoggerFactory CreateLoggerFactory() {
+    return new LoggerFactory();
+  }
   
 }

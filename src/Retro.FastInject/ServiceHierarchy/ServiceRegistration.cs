@@ -141,6 +141,6 @@ public record ServiceRegistration {
       return method.ToDisplayString();
     }
 
-    return Lifetime == ServiceScope.Singleton || scopedTransient ? $"_root.{method.Name}" : method.Name;
+    return Lifetime == ServiceScope.Scoped || scopedTransient ? $"_root.{method.Name}" : method.Name;
   }
 }

@@ -237,5 +237,25 @@ public static class TypeExtensions {
     // Construct the generic type with the provided element type(s)
     return genericType.Construct(elementTypes);
   }
+
+  /// <summary>
+  /// Constructs an instantiated generic type from the provided unbound generic type and type arguments.
+  /// </summary>
+  /// <param name="type">The unbound generic type represented by an <see cref="ITypeSymbol"/>.</param>
+  /// <param name="elementTypes">An array of <see cref="ITypeSymbol"/> representing the generic type arguments.</param>
+  /// <returns>
+  /// An <see cref="INamedTypeSymbol"/> representing the constructed generic type with the provided type arguments.
+  /// </returns>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown if the provided type is not an unbound generic type or if the type cannot be constructed with the provided type arguments.
+  /// </exception>
+  public static INamedTypeSymbol GetInstantiatedGeneric(this ITypeSymbol type, params ITypeSymbol[] elementTypes) {
+    if (type is not INamedTypeSymbol namedType) {
+      throw new InvalidOperationException($"Type '{type.ToDisplayString()}' is not an unbound generic.");
+    }
+    
+    // Construct the generic type with the provided element type(s)
+    return namedType.Construct(elementTypes);
+  }
   
 }

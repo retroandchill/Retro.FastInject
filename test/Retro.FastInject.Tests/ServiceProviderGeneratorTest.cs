@@ -171,6 +171,41 @@ public class ServiceProviderGeneratorTests {
     });
   }
 
+  [Test]
+  public async Task Generator_WithGenericServices_ShouldGenerateValidCode() {
+    // Arrange
+    const string source = """
+                          using System;
+                          using Retro.FastInject.Annotations;
+                          namespace TestNamespace {
+                              public interface IDependency {}
+                          
+                              public interface IDependency<T> : IDependency {}
+                              
+                              public class Dependency<T> : IDependency<T> {}
+                          
+                              public interface IService {}
+                              public class Service : IService {
+                                public Service(IDependency<int> dependency) {}
+                              }
+                              
+                              [ServiceProvider]
+                              [Singleton<Service>]
+                              [Transient(typeof(Dependency<>))]
+                              public partial class TestServiceProvider {}
+                          }
+                          """;
+
+    // Act
+    var (diagnostics, output) = await RunGenerator(source);
+
+    // Assert
+    Assert.Multiple(() => {
+      Assert.That(diagnostics, Is.Empty);
+      Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+    });
+  }
+
   private static Task<(ImmutableArray<Diagnostic> Diagnostics, Compilation Output)> RunGenerator(string source) {
     var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
     var generator = new ServiceProviderGenerator();

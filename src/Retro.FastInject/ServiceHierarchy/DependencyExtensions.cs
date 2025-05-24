@@ -76,7 +76,8 @@ public static class DependencyExtensions {
         .FirstOrDefault(kvp => kvp.Key == "Key")
         .Value.Value?.ToString();
 
-    return new ServiceDeclaration(injectedType, scope, key);
+    return new ServiceDeclaration(injectedType is INamedTypeSymbol { IsUnboundGenericType: true} unbound 
+                                      ? unbound.ConstructedFrom : injectedType, scope, key);
   }
 
   private static ResolvedDependencyArguments GetResolvedDependencyArguments(this AttributeData attribute) {
@@ -111,7 +112,7 @@ public static class DependencyExtensions {
     return new ResolvedDependencyArguments(serviceType, scope);
   }
 
-  private static IEnumerable<ITypeSymbol> GetAllSuperclasses(this ITypeSymbol type) {
+  public static IEnumerable<ITypeSymbol> GetAllSuperclasses(this ITypeSymbol type) {
     return type.WalkUpInheritanceHierarchy()
         .Concat(type.AllInterfaces)
         .Distinct(TypeSymbolEqualityComparer.Instance)

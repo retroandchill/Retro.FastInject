@@ -1,5 +1,6 @@
-﻿namespace Retro.FastInject.Sample.Services;
+﻿using Microsoft.Extensions.Logging;
+namespace Retro.FastInject.Sample.Services;
 
-public class SingletonService(string val = "hello") : ISingletonService {
+public class SingletonService(ILogger<SingletonService> logger, string val = "hello") : ISingletonService {
   
 }
