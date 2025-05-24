@@ -1,4 +1,5 @@
-﻿using Retro.FastInject.Annotations;
+﻿using Microsoft.Extensions.Logging;
+using Retro.FastInject.Annotations;
 using Retro.FastInject.Sample.Services;
 
 namespace Retro.FastInject.Sample;
@@ -9,6 +10,7 @@ namespace Retro.FastInject.Sample;
 [Singleton<OtherSingletonService>(Key = "other")]
 [Scoped<ScopedService>]
 [Transient<TransientService>]
+[Transient(typeof(Logger<>))]
 [Singleton<ValueService>]
 public sealed partial class SampleServiceProvider(int value, float simpleValue) {
 

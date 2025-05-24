@@ -46,6 +46,14 @@ public record ServiceRegistration {
   /// and requires a concrete implementation to be resolved.
   public ITypeSymbol? ImplementationType { get; init; }
 
+  /// Represents the resolved type of the service registration.
+  /// This property determines the type to be used during service resolution.
+  /// If an `ImplementationType` is provided, it is used as the resolved type;
+  /// otherwise, the `Type` property is used.
+  /// This property ensures that the correct type is employed when resolving
+  /// services in the dependency injection framework.
+  public ITypeSymbol ResolvedType => ImplementationType ?? Type;
+
   /// Represents the symbol associated with the service being registered.
   /// This property can hold information about a specific method, property,
   /// field, or null if no explicit association exists.
@@ -102,13 +110,14 @@ public record ServiceRegistration {
   public bool IsAsyncDisposable { get; init; }
 
   /// <summary>
-  /// Generates the initialization statement for the service registration, which includes
-  /// resolving service dependencies and handling lifetime-specific logic.
+  /// Generates the initialization statement for the service registration, incorporating
+  /// dependency resolution, lifetime considerations, and associated symbol handling.
   /// </summary>
-  /// <param name="parameters">A string containing the parameters required for the service instantiation or method invocation.</param>
+  /// <param name="parameters">The parameters required for the service instantiation or method invocation formatted as a string.</param>
+  /// <param name="scopedTransient">A boolean flag indicating whether to handle scoped transient initialization logic.</param>
   /// <returns>
-  /// A string representing the initializing statement for the service, accounting for its
-  /// associated lifetime, type, and any relevant symbols.
+  /// A string representing the initialization statement for the service, considering the
+  /// service's lifetime, type, and associated symbol.
   /// </returns>
   public string GetInitializingStatement(string parameters, bool scopedTransient = false) {
     var basicBody = AssociatedSymbol switch {

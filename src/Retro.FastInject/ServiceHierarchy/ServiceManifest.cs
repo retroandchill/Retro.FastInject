@@ -283,7 +283,7 @@ public class ServiceManifest {
   /// </returns>
   public IEnumerable<ServiceRegistration> GetAllServices() {
     return _services.Values
-        .SelectMany(list => list);
+        .SelectMany(list => list.Where(x => x.ResolvedType is INamedTypeSymbol { IsUnboundGenericType: false }));
   }
 
   /// <summary>
@@ -292,8 +292,6 @@ public class ServiceManifest {
   /// <param name="lifetime">The desired service lifetime for filtering the service registrations.</param>
   /// <returns>An enumerable collection of service registrations matching the specified lifetime.</returns>
   public IEnumerable<ServiceRegistration> GetServicesByLifetime(ServiceScope lifetime) {
-    return _services.Values
-        .SelectMany(list => list)
-        .Where(reg => reg.Lifetime == lifetime);
+    return GetAllServices().Where(reg => reg.Lifetime == lifetime);
   }
 }
