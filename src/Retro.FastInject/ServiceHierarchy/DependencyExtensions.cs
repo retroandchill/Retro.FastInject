@@ -112,6 +112,13 @@ public static class DependencyExtensions {
     return new ResolvedDependencyArguments(serviceType, scope);
   }
 
+  /// <summary>
+  /// Retrieves all superclasses and implemented interfaces of the specified type symbol,
+  /// including duplicates that are resolved based on type argument correctness and uniqueness.
+  /// </summary>
+  /// <param name="type">The type symbol for which superclasses and interfaces are to be determined.</param>
+  /// <returns>A collection of <see cref="ITypeSymbol"/> representing the superclasses and interfaces
+  /// of the specified type, filtered for validity as type arguments and ensuring uniqueness.</returns>
   public static IEnumerable<ITypeSymbol> GetAllSuperclasses(this ITypeSymbol type) {
     return type.WalkUpInheritanceHierarchy()
         .Concat(type.AllInterfaces)
