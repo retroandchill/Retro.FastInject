@@ -43,13 +43,9 @@ partial class {{ClassName}} : IServiceProvider,
     return null;
   }
   
-  {{#RegularServices}}
-  {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
-    {{#withIndent '    '}}
-    {{> ServiceResolution providerInterface='IServiceProvider' getServiceMethod='GetService' isScope=false providerInstance='this'}}
-    {{/withIndent}}
-  }  
-  {{/RegularServices}}
+  {{#withIndent '  '}}
+  {{> RegularServiceGetters isScope=false providerInstance='this'}}
+  {{/withIndent}}
 
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
     if (serviceKey is string asString) {
@@ -72,15 +68,11 @@ partial class {{ClassName}} : IServiceProvider,
 
   {{#KeyedServices}}
   {{ServiceType}}? IKeyedServiceProvider<{{ServiceType}}>.GetKeyedService(string serviceKey) {
-    {{#FromOtherService}}
-    return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);  
-    {{/FromOtherService}}
-    {{^FromOtherService}}
-    {{#withIndent '    '}}    
+    {{#withIndent '    '}}
     {{> KeyedServiceSwitch providerInstance='this' isScope=false}}
-    {{/withIndent}}    
-    {{/FromOtherService}}
+    {{/withIndent}}
   }
+
   {{/KeyedServices}}  
 
   public IServiceScope CreateScope() {
@@ -160,13 +152,9 @@ partial class {{ClassName}} : IServiceProvider,
       return null;
     }
     
-    {{#RegularServices}}
-    {{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {
-      {{#withIndent '      '}}
-      {{> ServiceResolution providerInterface='IServiceProvider' getServiceMethod='GetService' isScope=true providerInstance='this'}}
-      {{/withIndent}}
-    }  
-    {{/RegularServices}}
+    {{#withIndent '    '}}
+    {{> RegularServiceGetters isScope=true providerInstance='this'}}
+    {{/withIndent}}
 
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
       if (serviceKey is string asString) {
@@ -189,15 +177,11 @@ partial class {{ClassName}} : IServiceProvider,
 
     {{#KeyedServices}}
     {{ServiceType}}? IKeyedServiceProvider<{{ServiceType}}>.GetKeyedService(string serviceKey) {
-      {{#FromOtherService}}
-      return ((IKeyedServiceProvider<{{OtherType}}>) this).GetKeyedService(serviceKey);      
-      {{/FromOtherService}}
-      {{^FromOtherService}}
-      {{#withIndent '      '}}    
-      {{> KeyedServiceSwitch providerInstance='this' isScope=true}}
+      {{#withIndent '      '}}
+      {{> KeyedServiceSwitch providerInstance='this' isScope=false}}
       {{/withIndent}}
-      {{/FromOtherService}}
     }
+
     {{/KeyedServices}}  
 
     public void Dispose() {

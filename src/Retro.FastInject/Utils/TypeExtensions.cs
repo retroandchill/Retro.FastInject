@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 
@@ -209,4 +210,32 @@ public static class TypeExtensions {
 
     return type.NullableAnnotation == NullableAnnotation.Annotated ? new NullableData(true, type.WithNullableAnnotation(NullableAnnotation.None)) : new NullableData(false, type);
   }
+
+  /// <summary>
+  /// Constructs a generic type by instantiating it with the specified <paramref name="elementTypes"/>.
+  /// </summary>
+  /// <param name="elementTypes">The types to be used as the generic type argument for the constructed type.</param>
+  /// <param name="compilation">The current Roslyn <see cref="Compilation"/> instance used to access type metadata.</param>
+  /// <param name="type">The generic type definition to be instantiated, provided as a <see cref="Type"/>.</param>
+  /// <returns>
+  /// An <see cref="INamedTypeSymbol"/> representing the constructed generic type.
+  /// </returns>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown if the <paramref name="type"/> does not have a <see cref="Type.FullName"/> or if the metadata for the specified type cannot be found in the <paramref name="compilation"/>.
+  /// </exception>
+  public static INamedTypeSymbol GetInstantiatedGeneric(this Type type, Compilation compilation, params ITypeSymbol[] elementTypes) {
+    // Get the ImmutableArray<T> generic type definition from the compilation
+    if (type.FullName is null) {
+      throw new InvalidOperationException("Cannot operate on anonymous types.");
+    }
+    
+    var genericType = compilation.GetTypeByMetadataName(type.FullName);
+    
+    if (genericType == null)
+      throw new InvalidOperationException($"Could not find {type.FullName} type");
+    
+    // Construct the generic type with the provided element type(s)
+    return genericType.Construct(elementTypes);
+  }
+  
 }

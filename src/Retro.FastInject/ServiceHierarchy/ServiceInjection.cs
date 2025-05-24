@@ -1,4 +1,6 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 
 namespace Retro.FastInject.ServiceHierarchy;
@@ -17,6 +19,17 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// formatted to a display-friendly representation via the <c>ToDisplayString</c> method.
   /// </remarks>
   public string ServiceType { get; } = registration.Type.ToDisplayString();
+
+  /// <summary>
+  /// Gets the name of the service associated with this injection.
+  /// </summary>
+  /// <remarks>
+  /// This property retrieves the unqualified name of the service type represented by
+  /// the associated <see cref="ServiceRegistration"/>. The name is derived from the
+  /// <c>Name</c> property of the <see cref="ITypeSymbol"/> specified during the registration
+  /// process.
+  /// </remarks>
+  public string ServiceName { get; } = registration.Type.Name;
 
   /// <summary>
   /// Gets the name of the field used for storing the service during dependency injection.
@@ -58,7 +71,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// A singleton service is instantiated once and shared for the duration of the application lifecycle.
   /// </remarks>
   public bool IsSingleton { get; } =
-    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Singleton;
+    registration.ImplementationType is null && registration.CollectedServices is null 
+                                            && registration.Lifetime == ServiceScope.Singleton;
 
   /// <summary>
   /// Gets a value indicating whether the service has a scoped lifecycle in the dependency injection container.
@@ -69,7 +83,8 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// request and are shared within the scope of that request.
   /// </remarks>
   public bool IsScoped { get; } =
-    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Scoped;
+    registration.ImplementationType is null && registration.CollectedServices is null 
+                                            && registration.Lifetime == ServiceScope.Scoped;
 
   /// <summary>
   /// Indicates whether the service associated with this injection has a transient lifecycle.
@@ -80,7 +95,33 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// providing a new instance on every injection.
   /// </remarks>
   public bool IsTransient { get; } =
-    registration.ImplementationType is null && registration.Lifetime == ServiceScope.Transient;
+    registration.ImplementationType is null && registration.CollectedServices is null 
+                                            && registration.Lifetime == ServiceScope.Transient;
+
+  /// <summary>
+  /// Indicates whether this service represents a collection of other services.
+  /// </summary>
+  /// <remarks>
+  /// This property evaluates to true if the service is a collection containing multiple
+  /// service registrations, represented by the <c>CollectedServices</c> property. It is determined
+  /// by checking that the <c>ImplementationType</c> is null and that <c>CollectedServices</c> is not null.
+  /// </remarks>
+  public bool IsCollection { get; } = registration.ImplementationType is null && registration.CollectedServices is not null;
+
+  /// <summary>
+  /// Gets a collection of services associated with this registration if the service
+  /// represents a collection of multiple services.
+  /// </summary>
+  /// <remarks>
+  /// This property provides a list of collected services derived from the associated
+  /// <see cref="ServiceRegistration.CollectedServices"/>. Each service in the collection
+  /// is encapsulated within a <see cref="CollectedService"/> instance, allowing access
+  /// to additional details such as service type, index, and primary/last service indicators.
+  /// If no collected services are associated, this property returns an empty list.
+  /// </remarks>
+  public List<CollectedService> CollectedServices { get; } = registration.CollectedServices
+      ?.Select((x, i) => new CollectedService(x, i == registration.CollectedServices.Count))
+      .ToList() ?? [];
 
   /// <summary>
   /// Gets the unique identifier (key) associated with the service registration.
@@ -118,7 +159,7 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// additional handling for scoped and transient lifetimes when creating instances.
   /// </remarks>
   public string ScopedTransientInitializer { get; } = registration.GetInitializingStatement(parameters, true);
-
+  
   /// <summary>
   /// Indicates whether the service associated with this injection is disposable.
   /// </summary>
@@ -140,5 +181,35 @@ public class ServiceInjection(ServiceRegistration registration, string parameter
   /// </remarks>
   public bool IsAsyncDisposable { get; } = registration.IsAsyncDisposable;
 
+  /// <summary>
+  /// Gets a value that indicates whether the service is both disposable and asynchronously disposable.
+  /// </summary>
+  /// <remarks>
+  /// This property evaluates to <c>true</c> if the service associated with the current
+  /// registration implements both <c>IDisposable</c> and <c>IAsyncDisposable</c> interfaces.
+  /// It combines the values of the <see cref="ServiceRegistration.IsDisposable"/> and
+  /// <see cref="ServiceRegistration.IsAsyncDisposable"/> properties to determine if the service
+  /// requires proper cleanup through both synchronous and asynchronous disposal mechanisms.
+  /// </remarks>
   public bool DoubleDisposable { get; } = registration.IsDisposable && registration.IsAsyncDisposable;
+
+  /// <summary>
+  /// Gets or sets the index of this service injection within its associated collection or system.
+  /// </summary>
+  /// <remarks>
+  /// This property represents the positional identifier of the service injection in the context
+  /// of the dependency injection framework. It is used for tracking or ordering service registrations
+  /// where applicable.
+  /// </remarks>
+  public int Index { get; } = registration.IndexForType;
+
+  /// <summary>
+  /// Determines whether the current service injection is the primary service for its type.
+  /// </summary>
+  /// <remarks>
+  /// This property evaluates whether the current service instance is the primary one
+  /// among all registered services of the same type, based on its index. A service is
+  /// considered primary if its <see cref="ServiceRegistration.IndexForType"/> is zero.
+  /// </remarks>
+  public bool IsPrimary => Index == 0;
 }

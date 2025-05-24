@@ -73,4 +73,7 @@
     <data name="ServiceTypeResolutionTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
         <value>..\Templates\Partials\ServiceTypeResolution.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
     </data>
+    <data name="RegularServiceGettersTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\RegularServicesGetters.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
 </root>

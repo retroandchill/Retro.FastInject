@@ -1,0 +1,15 @@
+﻿{{#RegularServices}}
+{{#Options}}
+{{#IsPrimary}}
+{{ServiceType}} IServiceProvider<{{ServiceType}}>.GetService() {    
+{{/IsPrimary}}
+{{^IsPrimary}}
+public {{ServiceType}} Get{{ServiceName}}_{{Index}}() {
+{{/IsPrimary}}
+  {{#withIndent '  '}}
+  {{> ServiceResolution providerInterface='IServiceProvider' getServiceMethod='GetService' isScope=../../isScope providerInstance=../../providerInstance}}
+  {{/withIndent}}
+}
+
+{{/Options}}    
+{{/RegularServices}}

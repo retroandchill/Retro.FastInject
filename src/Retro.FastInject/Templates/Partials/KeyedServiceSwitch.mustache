@@ -1,11 +1,6 @@
-﻿switch (serviceKey) {
+﻿return serviceKey switch {
   {{#Options}}
-  case "{{Key}}": {
-    {{#withIndent '    '}}
-    {{> ServiceResolution providerInterface='IKeyedServiceProvider' getServiceMethod='GetKeyedService' serviceKey=true isScope=../isScope providerInstance=../providerInstance }}
-    {{/withIndent}}
-  }
+  "{{Key}}" => {{#IsPrimary}}((IServiceProvider<{{ServiceType}}>) this).GetService(),{{/IsPrimary}}{{^IsPrimary}}this.Get{{ServiceName}}_{{Index}}(),{{/IsPrimary}}
   {{/Options}}
-  default:
-    return null;
+  _ => null
 };

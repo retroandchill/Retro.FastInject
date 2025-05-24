@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System.Collections.Generic;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 
@@ -53,6 +54,13 @@ public record ServiceRegistration {
   /// The `AssociatedSymbol` helps resolve how the service instance should be
   /// created or accessed during dependency injection.
   public ISymbol? AssociatedSymbol { get; init; }
+
+  /// Represents a list of services that are part of a service collection registration.
+  /// This property is utilized when registering multiple services as a collection,
+  /// allowing aggregation of individual service registrations under a single parent.
+  /// Each element in the list corresponds to a specific service registration.
+  /// If the service registration does not represent a collection, this property may be null.
+  public List<ServiceRegistration>? CollectedServices { get; init; }
 
   /// Represents the index of the specific type registration within the list of registrations for the same service type.
   /// This property is automatically assigned when a service is registered and reflects the order in which
