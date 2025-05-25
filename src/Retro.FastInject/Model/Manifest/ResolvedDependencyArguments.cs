@@ -1,7 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Model.Manifest;
 
 /// <summary>
 /// Represents resolved dependency arguments used in the dependency injection system.

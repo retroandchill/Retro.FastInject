@@ -3,7 +3,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using Retro.FastInject.Annotations;
-using Retro.FastInject.ServiceHierarchy;
+using Retro.FastInject.Generation;
 using static Retro.FastInject.Tests.Utils.GeneratorTestHelpers;
 
 namespace Retro.FastInject.Tests.ServiceHierarchy;

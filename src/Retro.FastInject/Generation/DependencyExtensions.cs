@@ -1,11 +1,14 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Comparers;
+using Retro.FastInject.Model.Detection;
+using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Utils;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Generation;
 
 /// <summary>
 /// Provides extension methods for analyzing and retrieving dependency injection service details
