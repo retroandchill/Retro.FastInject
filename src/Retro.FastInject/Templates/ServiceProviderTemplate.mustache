@@ -9,7 +9,7 @@ namespace {{Namespace}};
 
 #nullable enable
 
-partial class {{ClassName}} : IServiceProvider, 
+partial class {{ClassName}} : 
     {{#RegularServices}}
     IServiceProvider<{{ServiceType}}>,
     {{/RegularServices}}
@@ -17,9 +17,7 @@ partial class {{ClassName}} : IServiceProvider,
     {{#KeyedServices}}
     IKeyedServiceProvider<{{ServiceType}}>,
     {{/KeyedServices}}
-    IServiceScopeFactory, 
-    IDisposable, 
-    IAsyncDisposable {
+    ICompileTimeServiceProvider {
 
   private Scope? _rootScope;
   {{#Singletons}}
@@ -84,6 +82,18 @@ partial class {{ClassName}} : IServiceProvider,
     return new Scope(this);
   }
 
+  public void TryAddDisposable(object instance) {
+    ObjectDisposedException.ThrowIf(_disposed, this);  
+    switch (instance) {
+      case IDisposable disposable:
+        _disposables.Add(new DisposableWrapper(disposable, instance as IAsyncDisposable));
+        break;
+      case IAsyncDisposable asyncDisposable:
+        _disposables.Add(new DisposableWrapper(null, asyncDisposable));
+        break;
+    }
+  }  
+
   public void Dispose() {
     if (_disposed) return;
     _disposed = true;
@@ -123,17 +133,14 @@ partial class {{ClassName}} : IServiceProvider,
     }
   }
 
-  public partial class Scope : IServiceProvider, 
+  public partial class Scope : 
                        {{#RegularServices}}
                        IServiceProvider<{{ServiceType}}>,
                        {{/RegularServices}}
-                       IKeyedServiceProvider,
-                       IServiceScope,
                        {{#KeyedServices}}
                        IKeyedServiceProvider<{{ServiceType}}>,
                        {{/KeyedServices}}
-                       IDisposable, 
-                       IAsyncDisposable {
+                       ICompileTimeServiceScope {
     
     private readonly SampleServiceProvider _root;
     {{#Scoped}}
@@ -197,6 +204,18 @@ partial class {{ClassName}} : IServiceProvider,
     }
 
     {{/KeyedServices}}  
+    
+    public void TryAddDisposable(object instance) {
+      ObjectDisposedException.ThrowIf(_disposed, this);  
+      switch (instance) {
+        case IDisposable disposable:
+          _disposables.Add(new DisposableWrapper(disposable, instance as IAsyncDisposable));
+          break;
+        case IAsyncDisposable asyncDisposable:
+          _disposables.Add(new DisposableWrapper(null, asyncDisposable));
+          break;
+      }
+    }  
 
     public void Dispose() {
       if (_disposed) return;
