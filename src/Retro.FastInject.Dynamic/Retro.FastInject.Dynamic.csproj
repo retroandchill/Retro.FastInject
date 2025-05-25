@@ -19,10 +19,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="ServiceLookup\" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\Retro.FastInject.Core\Retro.FastInject.Core.csproj" />
     </ItemGroup>
 

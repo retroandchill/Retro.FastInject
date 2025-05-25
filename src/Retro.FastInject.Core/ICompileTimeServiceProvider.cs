@@ -8,7 +8,6 @@ namespace Retro.FastInject.Core;
 /// This interface extends features for service resolution, scoping, and resource management.
 /// </remarks>
 public interface ICompileTimeServiceProvider : IKeyedServiceProvider,
-                                               IServiceScopeFactory,
                                                IDisposable,
                                                IAsyncDisposable {
 

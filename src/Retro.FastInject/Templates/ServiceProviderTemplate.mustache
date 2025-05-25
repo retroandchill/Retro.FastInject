@@ -9,7 +9,7 @@ namespace {{Namespace}};
 
 #nullable enable
 
-partial class {{ClassName}} : 
+partial class {{ClassName}} : ICompileTimeServiceProvider,
     {{#RegularServices}}
     IServiceProvider<{{ServiceType}}>,
     {{/RegularServices}}
@@ -17,7 +17,7 @@ partial class {{ClassName}} :
     {{#KeyedServices}}
     IKeyedServiceProvider<{{ServiceType}}>,
     {{/KeyedServices}}
-    ICompileTimeServiceProvider {
+    ICompileTimeScopeFactory {
 
   private Scope? _rootScope;
   {{#Singletons}}
@@ -25,6 +25,10 @@ partial class {{ClassName}} :
   {{/Singletons}}
   private readonly List<DisposableWrapper> _disposables = [];
   private bool _disposed;
+
+  ICompileTimeServiceScope ICompileTimeScopeFactory.GetRootScope() {
+    returns GetRootScope();
+  }
   
   private Scope GetRootScope() {
     ObjectDisposedException.ThrowIf(_disposed, this);

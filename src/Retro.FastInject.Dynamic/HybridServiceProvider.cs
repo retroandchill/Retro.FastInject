@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
 
@@ -10,25 +10,29 @@ namespace Retro.FastInject.Dynamic;
 /// <summary>
 /// A dynamic service provider that resolves services from an IServiceCollection.
 /// </summary>
-public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IServiceScopeFactory, IDisposable, IAsyncDisposable {
-  private readonly Scope _rootScope;
+public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : ICompileTimeServiceProvider, ICompileTimeScopeFactory {
+  private Scope? _rootScope;
   private readonly Dictionary<Type, List<ServiceDescriptor>> _descriptors = new();
   private readonly Dictionary<Type, Dictionary<object, List<ServiceDescriptor>>> _keyedDescriptors = new();
   private readonly Dictionary<ServiceDescriptor, object> _singletonInstances = new();
-  private readonly List<DisposableWrapper> _disposables = [];
-  private bool _disposed;
+  private readonly T _compileTimeServiceProvider;
+
 
   /// <summary>
-  /// Initializes a new instance of the <see cref="HybridServiceProvider"/> class.
+  /// A dynamic service provider that resolves services from an <see cref="IServiceCollection"/>
+  /// and integrates with a compile-time service provider.
   /// </summary>
-  /// <param name="services">The service collection to use for resolving services.</param>
-  public HybridServiceProvider(IServiceCollection services) {
+  /// <typeparam name="T">A type implementing <see cref="ICompileTimeServiceProvider"/> and <see cref="ICompileTimeScopeFactory"/>.</typeparam>
+  public HybridServiceProvider(T compileTimeServiceProvider, IServiceCollection services) {
+    ArgumentNullException.ThrowIfNull(compileTimeServiceProvider);
     ArgumentNullException.ThrowIfNull(services);
+
+    _compileTimeServiceProvider = compileTimeServiceProvider;
 
     // Organize descriptors by service type and lifetime
     foreach (var descriptor in services) {
 
-      if (descriptor.ServiceKey != null) {
+      if (descriptor.ServiceKey is not null) {
         if (!_keyedDescriptors.TryGetValue(descriptor.ServiceType, out var keyedServices)) {
           keyedServices = new Dictionary<object, List<ServiceDescriptor>>();
           _keyedDescriptors[descriptor.ServiceType] = keyedServices;
@@ -49,8 +53,11 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
         descriptorsList.Add(descriptor);
       }
     }
+  }
 
-    _rootScope = new Scope(this);
+  private Scope GetRootScope() {
+    return LazyInitializer.EnsureInitialized(ref _rootScope, 
+                                             () => CreateScope(_compileTimeServiceProvider.GetRootScope()));
   }
 
   /// <summary>
@@ -59,8 +66,6 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
   /// <param name="serviceType">The type of the service to get.</param>
   /// <returns>The service object or null if not found.</returns>
   public object? GetService(Type serviceType) {
-    ObjectDisposedException.ThrowIf(_disposed, this);
-
     if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceScopeFactory)) {
       return this;
     }
@@ -69,7 +74,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
 
     // Always use the last registered service when multiple registrations exist
     var descriptor = descriptors[^1];
-    return ResolveService(descriptor, _rootScope);
+    return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
 
   }
 
@@ -80,9 +85,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
   /// <param name="serviceKey">The key of the service to get.</param>
   /// <returns>The service object or null if not found.</returns>
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
-    ObjectDisposedException.ThrowIf(_disposed, this);
-
-    if (serviceKey == null) {
+    if (serviceKey is null) {
       return GetService(serviceType);
     }
 
@@ -92,7 +95,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
 
     // Always use the last registered service when multiple registrations exist
     var descriptor = descriptors[^1];
-    return ResolveService(descriptor, _rootScope);
+    return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
 
   }
 
@@ -105,7 +108,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
   /// <exception cref="InvalidOperationException">Thrown if the service is not found.</exception>
   public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
     var service = GetKeyedService(serviceType, serviceKey);
-    if (service == null) {
+    if (service is null) {
       throw new InvalidOperationException($"Service of type '{serviceType}' with key '{serviceKey}' cannot be resolved.");
     }
 
@@ -116,92 +119,44 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
   /// Creates a new service scope.
   /// </summary>
   /// <returns>The service scope.</returns>
-  public IServiceScope CreateScope() {
-    ObjectDisposedException.ThrowIf(_disposed, this);
-
-    return new Scope(this);
+  public Scope CreateScope(ICompileTimeServiceScope compileTimeServiceScope) {
+    return new Scope(this, compileTimeServiceScope);
   }
 
-  /// <summary>
-  /// Disposes the service provider and all disposable services.
-  /// </summary>
-  public void Dispose() {
-    if (_disposed) return;
-
-    _disposed = true;
-
-    _rootScope.Dispose();
-
-    foreach (var instance in _singletonInstances.Values) {
-      if (instance is IDisposable disposable) {
-        disposable.Dispose();
-      }
-    }
-
-    foreach (var disposable in _disposables) {
-      disposable.Dispose();
-    }
-
-    _singletonInstances.Clear();
-    _disposables.Clear();
-  }
-
-  /// <summary>
-  /// Asynchronously disposes the service provider and all disposable services.
-  /// </summary>
-  public async ValueTask DisposeAsync() {
-    if (_disposed) return;
-
-    _disposed = true;
-
-    await _rootScope.DisposeAsync();
-
-    foreach (var instance in _singletonInstances.Values) {
-      if (instance is IAsyncDisposable asyncDisposable) {
-        await asyncDisposable.DisposeAsync();
-      } else if (instance is IDisposable disposable) {
-        disposable.Dispose();
-      }
-    }
-
-    foreach (var disposable in _disposables) {
-      await disposable.DisposeAsync();
-    }
-
-    _singletonInstances.Clear();
-    _disposables.Clear();
-  }
-
-  private object? ResolveService(ServiceDescriptor descriptor, Scope currentScope) {
-    if (descriptor.Lifetime == ServiceLifetime.Singleton) {
-      if (_singletonInstances.TryGetValue(descriptor, out var instance)) {
+  private object? ResolveService(ServiceDescriptor descriptor, Scope currentScope, 
+                                 ICompileTimeServiceProvider serviceProvider) {
+    switch (descriptor.Lifetime) {
+      case ServiceLifetime.Singleton when _singletonInstances.TryGetValue(descriptor, out var instance):
         return instance;
-      }
+      case ServiceLifetime.Singleton: {
+        var service = CreateServiceInstance(descriptor, serviceProvider);
+        if (service is null) return service;
 
-      var service = CreateServiceInstance(descriptor, currentScope);
-      if (service != null) {
         _singletonInstances[descriptor] = service;
-        RegisterForDisposal(service);
+        serviceProvider.TryAddDisposable(service);
+        return service;
       }
-      return service;
-    } else if (descriptor.Lifetime == ServiceLifetime.Scoped) {
-      return currentScope.ResolveService(descriptor);
-    } else {
-      // Transient
-      var service = CreateServiceInstance(descriptor, currentScope);
-      if (service != null) {
-        currentScope.RegisterForDisposal(service);
+      case ServiceLifetime.Scoped:
+        return currentScope.ResolveService(descriptor);
+      case ServiceLifetime.Transient:
+      default: {
+        // Transient
+        var service = CreateServiceInstance(descriptor, serviceProvider);
+        if (service is not null) {
+          serviceProvider.TryAddDisposable(service);
+        }
+        return service;
       }
-      return service;
     }
   }
 
-  private object? CreateServiceInstance(ServiceDescriptor descriptor, Scope currentScope) {
-    if (descriptor.ImplementationInstance != null) {
+  private static object? CreateServiceInstance(ServiceDescriptor descriptor, 
+                                               ICompileTimeServiceProvider currentScope) {
+    if (descriptor.ImplementationInstance is not null) {
       return descriptor.ImplementationInstance;
     }
 
-    if (descriptor.ImplementationFactory != null) {
+    if (descriptor.ImplementationFactory is not null) {
       return descriptor.ImplementationFactory(currentScope);
     }
 
@@ -218,7 +173,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
         var parameterInstances = new object?[parameters.Length];
         var canResolveAll = true;
 
-        for (int i = 0; i < parameters.Length; i++) {
+        for (var i = 0; i < parameters.Length; i++) {
           var parameter = parameters[i];
 
           // Check if the parameter is a keyed service
@@ -226,7 +181,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
               .FirstOrDefault(a => a.GetType().Name == "FromKeyedServicesAttribute");
 
           object? parameterInstance;
-          if (keyedServiceAttribute != null) {
+          if (keyedServiceAttribute is not null) {
             // Extract the key value from the attribute
             var key = keyedServiceAttribute.GetType().GetProperty("Key")?.GetValue(keyedServiceAttribute);
             parameterInstance = currentScope.GetKeyedService(parameter.ParameterType, key);
@@ -234,7 +189,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
             parameterInstance = currentScope.GetService(parameter.ParameterType);
           }
 
-          if (parameterInstance == null && !parameter.IsOptional) {
+          if (parameterInstance is null && !parameter.IsOptional) {
             canResolveAll = false;
             break;
           }
@@ -254,37 +209,22 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
     }
   }
 
-  private void RegisterForDisposal(object instance) {
-    switch (instance) {
-      case IDisposable disposable:
-        _disposables.Add(new DisposableWrapper(disposable, instance as IAsyncDisposable));
-        break;
-      case IAsyncDisposable asyncDisposable:
-        _disposables.Add(new DisposableWrapper(null, asyncDisposable));
-        break;
-    }
-  }
-
   /// <summary>
   /// A scope that provides services from a service provider.
   /// </summary>
-  public class Scope : IServiceProvider, IKeyedServiceProvider, IServiceScope, IDisposable, IAsyncDisposable {
-    private readonly HybridServiceProvider _hybridServiceProvider;
+  public sealed class Scope : IKeyedServiceProvider {
+    private readonly HybridServiceProvider<T> _hybridServiceProvider;
+    private readonly ICompileTimeServiceScope _compileTimeScope;
     private readonly Dictionary<ServiceDescriptor, object> _scopedInstances = new();
-    private readonly List<DisposableWrapper> _disposables = [];
-    private bool _disposed;
-
-    /// <summary>
-    /// Gets the service provider for this scope.
-    /// </summary>
-    public IServiceProvider ServiceProvider => this;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Scope"/> class.
     /// </summary>
     /// <param name="hybridServiceProvider">The service provider.</param>
-    public Scope(HybridServiceProvider hybridServiceProvider) {
+    /// <param name="scope">The compile time service provider's scope.</param>
+    public Scope(HybridServiceProvider<T> hybridServiceProvider, ICompileTimeServiceScope scope) {
       _hybridServiceProvider = hybridServiceProvider;
+      _compileTimeScope = scope;
     }
 
     /// <summary>
@@ -293,8 +233,6 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
     /// <param name="serviceType">The type of the service to get.</param>
     /// <returns>The service object or null if not found.</returns>
     public object? GetService(Type serviceType) {
-      ObjectDisposedException.ThrowIf(_disposed, this);
-
       if (serviceType == typeof(IServiceProvider)) {
         return this;
       }
@@ -307,7 +245,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
 
       // Always use the last registered service when multiple registrations exist
       var descriptor = descriptors[^1];
-      return _hybridServiceProvider.ResolveService(descriptor, this);
+      return _hybridServiceProvider.ResolveService(descriptor, this, _compileTimeScope);
 
     }
 
@@ -318,10 +256,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
     /// <param name="serviceKey">The key of the service to get.</param>
     /// <returns>The service object or null if not found.</returns>
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
-      
-      ObjectDisposedException.ThrowIf(_disposed, this);
-
-      if (serviceKey == null) {
+      if (serviceKey is null) {
         return GetService(serviceType);
       }
 
@@ -331,7 +266,7 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
 
       // Always use the last registered service when multiple registrations exist
       var descriptor = descriptors[^1];
-      return _hybridServiceProvider.ResolveService(descriptor, this);
+      return _hybridServiceProvider.ResolveService(descriptor, this, _compileTimeScope);
 
     }
 
@@ -344,60 +279,11 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
     /// <exception cref="InvalidOperationException">Thrown if the service is not found.</exception>
     public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
       var service = GetKeyedService(serviceType, serviceKey);
-      if (service == null) {
+      if (service is null) {
         throw new InvalidOperationException($"Service of type '{serviceType}' with key '{serviceKey}' cannot be resolved.");
       }
 
       return service;
-    }
-
-    /// <summary>
-    /// Disposes the scope and all disposable services.
-    /// </summary>
-    public void Dispose() {
-      if (_disposed) return;
-
-      _disposed = true;
-
-      foreach (var instance in _scopedInstances.Values) {
-        if (instance is IDisposable disposable) {
-          disposable.Dispose();
-        }
-      }
-
-      foreach (var disposable in _disposables) {
-        disposable.Dispose();
-      }
-
-      _scopedInstances.Clear();
-      _disposables.Clear();
-    }
-
-    /// <summary>
-    /// Asynchronously disposes the scope and all disposable services.
-    /// </summary>
-    public async ValueTask DisposeAsync() {
-      if (_disposed) return;
-
-      _disposed = true;
-
-      foreach (var instance in _scopedInstances.Values) {
-        switch (instance) {
-          case IAsyncDisposable asyncDisposable:
-            await asyncDisposable.DisposeAsync();
-            break;
-          case IDisposable disposable:
-            disposable.Dispose();
-            break;
-        }
-      }
-
-      foreach (var disposable in _disposables) {
-        await disposable.DisposeAsync();
-      }
-
-      _scopedInstances.Clear();
-      _disposables.Clear();
     }
 
     internal object? ResolveService(ServiceDescriptor descriptor) {
@@ -405,23 +291,12 @@ public class HybridServiceProvider : IServiceProvider, IKeyedServiceProvider, IS
         return instance;
       }
 
-      var service = _hybridServiceProvider.CreateServiceInstance(descriptor, this);
-      if (service != null) {
-        _scopedInstances[descriptor] = service;
-        RegisterForDisposal(service);
-      }
-      return service;
-    }
+      var service = CreateServiceInstance(descriptor, _compileTimeScope);
+      if (service is null) return service;
 
-    internal void RegisterForDisposal(object instance) {
-      switch (instance) {
-        case IDisposable disposable:
-          _disposables.Add(new DisposableWrapper(disposable, instance as IAsyncDisposable));
-          break;
-        case IAsyncDisposable asyncDisposable:
-          _disposables.Add(new DisposableWrapper(null, asyncDisposable));
-          break;
-      }
+      _scopedInstances[descriptor] = service;
+      _compileTimeScope.TryAddDisposable(service);
+      return service;
     }
   }
 }
