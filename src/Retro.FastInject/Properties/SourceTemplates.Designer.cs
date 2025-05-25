@@ -80,16 +80,49 @@ namespace Retro.FastInject {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to switch (serviceKey) {
+        ///   Looks up a localized string similar to {{! This template generates the service initialization statement, handling different lifetimes and types }}
+        ///{{#IsTransient}}
+        ///{{#HasAssociatedPropertyOrField}}
+        ///{{&gt; InitializingStatement}}{{/HasAssociatedPropertyOrField}}
+        ///{{^HasAssociatedPropertyOrField}}{{&gt; InitializingStatement}}
+        ///{{/HasAssociatedPropertyOrField}}
+        ///{{/IsTransient}}
+        ///{{^IsTransient}}
+        ///{{#HasAssociatedPropertyOrField}}
+        ///{{&gt; InitializingStatement}}
+        ///{{/HasAssociatedPropertyOrField}}
+        ///{{^HasAssociatedPropertyOrField}}
+        ///{{#IsValueType}}
+        ///Ini [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string GetInitializingStatementTemplate {
+            get {
+                return ResourceManager.GetString("GetInitializingStatementTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {{! This template handles service initialization with different patterns based on lifetime and symbol type }}
+        ///{{#HasAssociatedMethod}}
+        ///{{#IsMethodStatic}}
+        ///{{AssociatedMethodFullName}}
+        ///{{/IsMethodStatic}}
+        ///{{^IsMethodStatic}}
+        ///{{#IsScoped}}
+        ///{{#scopedTransient}}_root.{{/scopedTransient}}{{AssociatedSymbolName}}{{/IsScoped}}{{^IsScoped}}{{^scopedTransient}}{{AssociatedSymbolName}}{{/scopedTransient}}{{#scopedTransient}}_root.{{AssociatedSymbolName}}{{/scopedTransient}}{{/IsScoped}}{{/IsMethodStatic}}({{pa [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string InitializingStatementTemplate {
+            get {
+                return ResourceManager.GetString("InitializingStatementTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to return serviceKey switch {
         ///  {{#Options}}
-        ///  case &quot;{{Key}}&quot;: {
-        ///    {{#withIndent &apos;    &apos;}}
-        ///    {{&gt; ServiceResolution providerInterface=&apos;IKeyedServiceProvider&apos; getServiceMethod=&apos;GetKeyedService&apos; serviceKey=true isScope=../isScope providerInstance=../providerInstance }}
-        ///    {{/withIndent}}
-        ///  }
+        ///  &quot;{{Key}}&quot; =&gt; {{#IsPrimary}}((IServiceProvider&lt;{{ServiceType}}&gt;) this).GetService(),{{/IsPrimary}}{{^IsPrimary}}this.Get{{ServiceName}}_{{Index}}(),{{/IsPrimary}}
         ///  {{/Options}}
-        ///  default:
-        ///    return null;
+        ///  _ =&gt; null
         ///};
         ///.
         /// </summary>
@@ -100,14 +133,53 @@ namespace Retro.FastInject {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to {{#SelectedService}}
+        ///{{#Index}}this.Get{{ServiceName}}_{{Index}}(){{/Index}}
+        ///{{^Index}}((IServiceProvider&lt;{{ServiceType}}&gt;) this).GetService(){{/Index}}
+        ///{{/SelectedService}}
+        ///{{^SelectedService}}
+        ///{{#DefaultValue}}
+        ///{{#UseDynamic}}_hybridServiceProvider.GetService&lt;{{ParameterType}}&gt;() ?? {{DefaultValue}}{{/UseDynamic}}
+        ///{{^UseDynamic}}{{DefaultValue}}{{/UseDynamic}}
+        ///{{/DefaultValue}}
+        ///{{^DefaultValue}}
+        ///{{#UseDynamic}}
+        ///{{#IsNullable}}_hybridServiceProvider.GetService&lt;{{ParameterType}}&gt;(){{/IsNullable}} [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string ParameterResolutionTemplate {
+            get {
+                return ResourceManager.GetString("ParameterResolutionTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {{! This template generates a comma-separated list of parameters using the ParameterResolution template }}
+        ///{{#Parameters}}
+        ///{{&gt; ParameterResolution}}{{^IsLast}}, {{/IsLast}}
+        ///{{/Parameters}}
+        ///.
+        /// </summary>
+        internal static string ParametersHelperTemplate {
+            get {
+                return ResourceManager.GetString("ParametersHelperTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to {{#RegularServices}}
-        ///{{#Primary}}
-        ///{{ServiceType}} IServiceProvider&lt;{{ServiceType}}&gt;.GetService() {
-        ///  {{#withIndent &apos;    &apos;}}
-        ///  {{&gt; ServiceResolution providerInterface=&apos;IServiceProvider&apos; getServiceMethod=&apos;GetService&apos; isScope=../../isScope providerInstance=../../providerInstance}}          
+        ///{{#Options}}
+        ///{{#IsPrimary}}
+        ///{{ServiceType}} IServiceProvider&lt;{{ServiceType}}&gt;.GetService() {    
+        ///{{/IsPrimary}}
+        ///{{^IsPrimary}}
+        ///public {{ServiceType}} Get{{ServiceName}}_{{Index}}() {
+        ///{{/IsPrimary}}
+        ///  {{#withIndent &apos;  &apos;}}
+        ///  {{&gt; ServiceResolution providerInterface=&apos;IServiceProvider&apos; getServiceMethod=&apos;GetService&apos; isScope=../../isScope providerInstance=../../providerInstance}}
         ///  {{/withIndent}}
         ///}
-        ///{{/Primary}}
+        ///
+        ///{{/Options}}    
         ///{{/RegularServices}}.
         /// </summary>
         internal static string RegularServiceGettersTemplate {
@@ -123,20 +195,20 @@ namespace Retro.FastInject {
         ///using System.Threading.Tasks;
         ///using Microsoft.Extensions.DependencyInjection;
         ///using Retro.FastInject.Core;
+        ///{{#WithDynamicServices}}
+        ///using Retro.FastInject.Dynamic;    
+        ///{{/WithDynamicServices}}
         ///
         ///namespace {{Namespace}};
         ///
         ///#nullable enable
         ///
-        ///partial class {{ClassName}} : IServiceProvider, 
+        ///partial class {{ClassName}} : ICompileTimeServiceProvider,
         ///    {{#RegularServices}}
         ///    IServiceProvider&lt;{{ServiceType}}&gt;,
         ///    {{/RegularServices}}
         ///    IKeyedServiceProvider,
-        ///    {{#KeyedServices}}
-        ///    IKeyedServiceProvider&lt;{{ServiceType}}&gt;,
-        ///    {{/KeyedServices}}
-        ///    IServiceSc [rest of string was truncated]&quot;;.
+        ///    {{#K [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string ServiceProviderTemplate {
             get {
@@ -146,11 +218,11 @@ namespace Retro.FastInject {
         
         /// <summary>
         ///   Looks up a localized string similar to {{#FromOtherService}}
-        ///{{indent}}return (({{providerInterface}}&lt;{{OtherType}}&gt;) {{providerInstance}}).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}});  
+        ///return (({{providerInterface}}&lt;{{OtherType}}&gt;) {{providerInstance}}).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}});  
         ///{{/FromOtherService}}
         ///{{#IsSingleton}}
         ///{{#if isScope}}
-        ///{{indent}}return (({{providerInterface}}&lt;{{ServiceType}}&gt;) _root).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}}); 
+        ///return (({{providerInterface}}&lt;{{ServiceType}}&gt;) _root).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}}); 
         ///{{else}}
         ///return {{InitializingStatement}};
         ///{{/if}} 
@@ -159,7 +231,7 @@ namespace Retro.FastInject {
         ///{{#if isScope}}    
         ///return {{InitializingStatement}};
         ///{{else}}
-        ///return (( [rest of string was truncated]&quot;;.
+        ///return (({{providerInterface} [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string ServiceResolutionTemplate {
             get {

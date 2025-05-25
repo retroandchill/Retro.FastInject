@@ -1,0 +1,18 @@
+﻿{{~#SelectedService~}}
+{{~#Index~}}this.Get{{ServiceName}}_{{Index}}(){{~/Index~}}
+{{~^Index~}}((IServiceProvider<{{ServiceType}}>) this).GetService(){{~/Index~}}
+{{~/SelectedService~}}
+{{~^SelectedService~}}
+{{~#HasDefaultValue~}}
+{{~#UseDynamic~}}
+{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ParameterType}}>() ?? {{DefaultValue}}{{~/UseDynamic~}}
+{{~^UseDynamic~}}{{DefaultValue}}{{~/UseDynamic~}}
+{{~/HasDefaultValue~}}
+{{~^HasDefaultValue~}}
+{{~#UseDynamic~}}
+{{~#IsNullable~}}{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ParameterType}}>(){{~/IsNullable~}}
+{{~^IsNullable~}}{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetRequiredService<{{ParameterType}}>(){{~/IsNullable~}}
+{{~/UseDynamic~}}
+{{~^UseDynamic~}}null{{~/UseDynamic~}}
+{{~/HasDefaultValue~}}
+{{~/SelectedService~}}

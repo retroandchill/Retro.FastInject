@@ -117,19 +117,14 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
 
     // Prepare constructor resolution information for template
     var constructorResolutions = manifest.GetAllConstructorResolutions()
-        .Select(cr => new {
-            cr.Type,
-            Parameters = cr.Parameters.Select(p => p.GetArgDefaultValue()).Joining(", ")
-        })
         .ToDictionary(x => x.Type, x => x.Parameters, TypeSymbolEqualityComparer.Instance);
 
     var regularServices = manifest.GetAllServices()
         .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
         .Select(x => new {
             ServiceType = x.Key.ToDisplayString(),
-            Options = x.Select(y => new ServiceInjection(y,
-                                   constructorResolutions.TryGetValue(x.Key, out var parameters) 
-                                       ? parameters : ""))
+            Options = x.Select(y => ServiceInjection.FromResolution(y, 
+                    constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : []))
                 .ToList()
         })
         .ToList();
@@ -187,6 +182,10 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     handlebars.RegisterTemplate("ServiceTypeResolution", SourceTemplates.ServiceTypeResolutionTemplate);
     handlebars.RegisterTemplate("KeyedServiceSwitch", SourceTemplates.KeyedServiceSwitchTemplate);
     handlebars.RegisterTemplate("RegularServiceGetters", SourceTemplates.RegularServiceGettersTemplate);
+    handlebars.RegisterTemplate("InitializingStatement", SourceTemplates.InitializingStatementTemplate);
+    handlebars.RegisterTemplate("GetInitializingStatement", SourceTemplates.GetInitializingStatementTemplate);
+    handlebars.RegisterTemplate("ParameterResolution", SourceTemplates.ParameterResolutionTemplate);
+    handlebars.RegisterTemplate("ParametersTemplateHelper", SourceTemplates.ParametersHelperTemplate);
 
     handlebars.RegisterHelper("withIndent", (writer, options, _, parameters) => {
       var indent = parameters[0] as string ?? "";

@@ -102,7 +102,8 @@ public static class ResolutionExtensions {
     // Create parameter resolution
     var parameterResolution = new ParameterResolution {
         Parameter = parameter,
-        ParameterType = paramType
+        ParameterType = paramType,
+        IsNullable = isNullable
     };
 
     // Check for FromKeyedServices attribute
@@ -122,6 +123,11 @@ public static class ResolutionExtensions {
     parameterResolution.SelectedService = selectedService;
     parameterResolution.DefaultValue = parameter.GetDefaultValueString();
     constructorResolution.Parameters.Add(parameterResolution);
+
+    if (!canResolve && parameter.GetAttribute<AllowDynamicAttribute>() is not null) {
+      parameterResolution.UseDynamic = true;
+      return;
+    }
 
     if (canResolve || isNullable || parameterResolution.DefaultValue is not null) return;
       
@@ -244,16 +250,17 @@ public static class ResolutionExtensions {
     }
 
     var immutableArrayType = typeof(ImmutableArray<>).GetInstantiatedGeneric(compilation, elementType);
-    serviceManifest.AddService(immutableArrayType, ServiceScope.Transient);
+    selectedService = serviceManifest.AddService(immutableArrayType, ServiceScope.Transient,
+        collectedServices: elementServices
+            .Select(serviceManifest.ResolveConcreteType)
+            .ToList());
     var readOnlyListType = typeof(IReadOnlyList<>).GetInstantiatedGeneric(compilation, elementType);
     serviceManifest.AddService(readOnlyListType, ServiceScope.Transient, immutableArrayType);
     var readOnlyCollectionType = typeof(IReadOnlyCollection<>).GetInstantiatedGeneric(compilation, elementType);
     serviceManifest.AddService(readOnlyCollectionType, ServiceScope.Transient, immutableArrayType);
     var enumerableType = typeof(IEnumerable<>).GetInstantiatedGeneric(compilation, elementType);
-    selectedService = serviceManifest.AddService(enumerableType, ServiceScope.Transient, immutableArrayType,
-                                                 collectedServices: elementServices
-                                                     .Select(serviceManifest.ResolveConcreteType)
-                                                     .ToList());
+    serviceManifest.AddService(enumerableType, ServiceScope.Transient, immutableArrayType);
+    
     return true;
   }
 
@@ -276,24 +283,5 @@ public static class ResolutionExtensions {
     }
     
     return declaration;
-  }
-  
-  /// <summary>
-  /// Retrieves the default value of the argument for the provided parameter resolution.
-  /// </summary>
-  /// <param name="parameterResolution">The parameter resolution from which to obtain the default value.</param>
-  /// <returns>
-  /// A string representing the default value of the argument. If a default value is defined, it is returned.
-  /// Otherwise, a service resolution expression or "null" is returned based on the context.
-  /// </returns>
-  public static string GetArgDefaultValue(this ParameterResolution parameterResolution) {
-    if (parameterResolution.SelectedService is null || parameterResolution.DefaultValue is not null) {
-      return parameterResolution.DefaultValue ?? "null";
-    }
-              
-    var serviceType = parameterResolution.SelectedService.Type;
-    return parameterResolution.SelectedService.IndexForType > 0 
-        ? $"this.Get{serviceType.Name}_{parameterResolution.SelectedService.IndexForType}()" 
-        : $"((IServiceProvider<{serviceType.ToDisplayString()}>) this).GetService()";
   }
 }

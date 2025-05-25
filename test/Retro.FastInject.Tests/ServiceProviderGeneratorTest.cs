@@ -206,6 +206,41 @@ public class ServiceProviderGeneratorTests {
     });
   }
 
+  [Test]
+  public async Task Generator_WithIEnumerableDependency_ShouldGenerateValidCode() {
+    // Arrange
+    const string source = """
+                          using System.Collections.Generic;
+                          using Retro.FastInject.Annotations;
+                          namespace TestNamespace {
+                              public interface IPlugin {}
+                              
+                              public class PluginA : IPlugin {}
+                              
+                              public class PluginB : IPlugin {}
+                              
+                              public class PluginService {
+                                  public PluginService(IEnumerable<IPlugin> plugins) {}
+                              }
+                              
+                              [ServiceProvider]
+                              [Singleton<PluginA>]
+                              [Singleton<PluginB>]
+                              [Singleton<PluginService>]
+                              public partial class TestServiceProvider {}
+                          }
+                          """;
+  
+    // Act
+    var (diagnostics, output) = await RunGenerator(source);
+  
+    // Assert
+    Assert.Multiple(() => {
+      Assert.That(diagnostics, Is.Empty);
+      Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+    });
+  }
+  
   private static Task<(ImmutableArray<Diagnostic> Diagnostics, Compilation Output)> RunGenerator(string source) {
     var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
     var generator = new ServiceProviderGenerator();

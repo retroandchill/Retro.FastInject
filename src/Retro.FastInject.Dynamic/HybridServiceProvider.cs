@@ -75,7 +75,6 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     // Always use the last registered service when multiple registrations exist
     var descriptor = descriptors[^1];
     return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
-
   }
 
   /// <summary>
@@ -96,7 +95,6 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     // Always use the last registered service when multiple registrations exist
     var descriptor = descriptors[^1];
     return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
-
   }
 
   /// <summary>

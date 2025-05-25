@@ -1,0 +1,5 @@
+﻿{{~#IsTransient~}}{{~#HasAssociatedPropertyOrField~}}{{~> InitializingStatement~}}{{~/HasAssociatedPropertyOrField~}}{{~^HasAssociatedPropertyOrField~}}{{~> InitializingStatement~}}{{~/HasAssociatedPropertyOrField~}}{{~/IsTransient~}}
+{{~^IsTransient~}}{{~#HasAssociatedPropertyOrField~}}{{~> InitializingStatement~}}{{~/HasAssociatedPropertyOrField~}}{{~^HasAssociatedPropertyOrField~}}
+{{~#IsValueType~}}InitializationUtils.EnsureValueInitialized(ref {{FieldName}}, this, () => {{~> InitializingStatement~}}){{~/IsValueType~}}
+{{~^IsValueType~}}System.Threading.LazyInitializer.EnsureInitialized(ref {{FieldName}}, () => {{~> InitializingStatement~}}){{~/IsValueType~}}
+{{~/HasAssociatedPropertyOrField~}}{{~/IsTransient~}}
