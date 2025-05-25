@@ -4,7 +4,7 @@ using Retro.FastInject.Sample.Services;
 
 namespace Retro.FastInject.Sample;
 
-[ServiceProvider]
+[ServiceProvider(AllowDynamicRegistrations = true)]
 [Singleton<SingletonService>]
 [Singleton<KeyedSingleton>(Key = "keyed")]
 [Singleton<OtherSingletonService>(Key = "other")]
@@ -14,14 +14,21 @@ namespace Retro.FastInject.Sample;
 [Singleton<ValueService>]
 [Singleton<GenericService<int>>]
 [Singleton<GenericService<float>>]
-public sealed partial class SampleServiceProvider(int value, float simpleValue) {
+public sealed partial class SampleServiceProvider {
+  
+  private readonly int _value;
+  
+  private SampleServiceProvider(int value, float simpleValue) {
+    _value = value;
+    SimpleValue = simpleValue;
+  }
 
   [Instance]
-  private float SimpleValue { get; } = simpleValue;
+  private float SimpleValue { get; }
 
   [Factory(ServiceScope.Transient)]
   private FactoryConstructedService CreateFactoryConstructedService() {
-    return new FactoryConstructedService(value);
+    return new FactoryConstructedService(_value);
   }
 
   [Factory]

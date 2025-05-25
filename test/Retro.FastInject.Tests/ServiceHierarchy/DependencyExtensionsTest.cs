@@ -53,7 +53,7 @@ public class DependencyExtensionsTests {
     var testClass = GetTypeSymbol("TestClass1");
 
     // Act
-    var services = testClass.GetInjectedServices().ToList();
+    var services = testClass.GetInjectedServices();
 
     // Assert
     var serviceA = services.FirstOrDefault(s => s.Type.Name == "ServiceA");
@@ -70,7 +70,7 @@ public class DependencyExtensionsTests {
     var testClass = GetTypeSymbol("TestClass1");
 
     // Act
-    var services = testClass.GetInjectedServices().ToList();
+    var services = testClass.GetInjectedServices();
 
     // Assert
     var serviceB = services.FirstOrDefault(s => s.Type.Name == "ServiceB");
@@ -87,7 +87,7 @@ public class DependencyExtensionsTests {
     var testClass = GetTypeSymbol("TestClass1");
 
     // Act
-    var services = testClass.GetInjectedServices().ToList();
+    var services = testClass.GetInjectedServices();
 
     // Assert
     var serviceC = services.FirstOrDefault(s => s.Type.Name == "ServiceC");
@@ -104,7 +104,7 @@ public class DependencyExtensionsTests {
     var testClass = GetTypeSymbol("TestClass2");
 
     // Act
-    var services = testClass.GetInjectedServices().ToList();
+    var services = testClass.GetInjectedServices();
 
     // Assert
     Assert.That(services, Has.Count.EqualTo(4)); // All services from TestClass1 + ServiceD
@@ -122,7 +122,7 @@ public class DependencyExtensionsTests {
     var testClass = GetTypeSymbol("TestClass3");
 
     // Act
-    var services = testClass.GetInjectedServices().ToList();
+    var services = testClass.GetInjectedServices();
 
     // Assert
     Assert.That(services, Has.Count.EqualTo(4)); // All services from TestClass1 + ServiceD

@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Microsoft.CodeAnalysis;
+using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Manifest;
 
 namespace Retro.FastInject.Generation;
@@ -14,10 +15,7 @@ public static class ServiceManifestGenerator {
   /// </summary>
   /// <param name="classSymbol">An instance of <see cref="ITypeSymbol"/> representing the class type whose services and dependencies will be analyzed.</param>
   /// <returns>A <see cref="ServiceManifest"/> object containing detailed mappings of services, implementations, and dependencies.</returns>
-  public static ServiceManifest GenerateManifest(this ITypeSymbol classSymbol) {
-    // Get all services using GetInjectedServices
-    var services = classSymbol.GetInjectedServices().ToList();
-
+  public static ServiceManifest GenerateManifest(this in ServiceDeclarationCollection services) {
     // Get the dependencies dictionary
     var dependencies = services.GetDependencies();
 

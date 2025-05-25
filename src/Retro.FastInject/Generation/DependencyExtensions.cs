@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
@@ -23,12 +24,22 @@ public static class DependencyExtensions {
   /// <param name="classSymbol">The class symbol to analyze for injected services.</param>
   /// <returns>A collection of <see cref="ServiceDeclaration"/> objects representing the
   /// injected services and their associated metadata.</returns>
-  public static IEnumerable<ServiceDeclaration> GetInjectedServices(this ITypeSymbol classSymbol) {
+  public static ServiceDeclarationCollection GetInjectedServices(this ITypeSymbol classSymbol) {
+    var allowDynamicServices = false;
+    
     var alreadyImported = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
     // Get services from class attributes
     var attributeServices = classSymbol.GetAttributes()
         .SelectMany(x => {
+          if (x.IsOfAttributeType<ServiceProviderAttribute>()) {
+            allowDynamicServices = allowDynamicServices || x.NamedArguments
+                .Where(y => y.Key == nameof(ServiceProviderAttribute.AllowDynamicRegistrations))
+                .Select(y => y.Value.Value)
+                .FirstOrDefault() is true;
+            return [];
+          }
+          
           if (x.IsOfAttributeType<DependencyAttribute>()) {
             return [GetServiceDeclaration(x)];
           }
@@ -36,6 +47,10 @@ public static class DependencyExtensions {
           if (!x.IsOfAttributeType<ImportAttribute>()) return [];
 
           var importedType = x.ImportedType();
+          allowDynamicServices = allowDynamicServices || x.NamedArguments
+              .Where(y => y.Key == nameof(ServiceProviderAttribute.AllowDynamicRegistrations))
+              .Select(y => y.Value.Value)
+              .FirstOrDefault() is true;
           return alreadyImported.Add(importedType) ? importedType.GetInjectedServices() : [];
         });
 
@@ -49,7 +64,14 @@ public static class DependencyExtensions {
         .Where(m => m is IFieldSymbol or IPropertySymbol)
         .SelectMany(GetInstanceServices);
 
-    return attributeServices.Concat(factoryServices).Concat(instanceServices);
+    var services = attributeServices.Concat(factoryServices)
+        .Concat(instanceServices)
+        .ToImmutableArray();
+
+    if (classSymbol is not INamedTypeSymbol namedClassSymbol) {
+      throw new InvalidOperationException("Service provider must be a Named Type.");
+    }
+    return new ServiceDeclarationCollection(namedClassSymbol, services, allowDynamicServices);
   }
 
   private static ITypeSymbol ImportedType(this AttributeData attribute) {

@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Comparers;
 using Retro.FastInject.Generation;
+using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Template;
 using Retro.FastInject.Utils;
 
@@ -71,8 +72,9 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
           ));
       return;
     }
-
-    var manifest = classSymbol.GenerateManifest();
+    var services = classSymbol.GetInjectedServices();
+    ValidateConstructors(services, context);
+    var manifest = services.GenerateManifest();
 
     // First, resolve all constructor dependencies for all service implementations
     var explicitServices = manifest.GetAllServices().ToList();
@@ -144,6 +146,17 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var templateParams = new {
         Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
         ClassName = classSymbol.Name,
+        WithDynamicServices = services.AllowDynamicServices,
+        Constructors = services.ContainerType.Constructors
+            .Select(x => new {
+              Params = x.Parameters.Select((p, i) => new {
+                  Type = p.Type.ToDisplayString(),
+                  p.Name,
+                  IsLast = i == x.Parameters.Length - 1
+              })
+              .ToList()
+            })
+            .ToList(),
         RegularServices = regularServices,
         KeyedServices = keyedServices,
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
@@ -200,4 +213,30 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
 
     Console.WriteLine(manifest.ToString());
   }
+  
+  private static void ValidateConstructors(in ServiceDeclarationCollection declaration, SourceProductionContext context) {
+    if (!declaration.AllowDynamicServices) {
+      return;
+    }
+    
+    var publicConstructors = declaration.ContainerType.Constructors
+        .Where(c => c.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal);
+    
+    if (publicConstructors.Any()) {
+      context.ReportDiagnostic(
+          Diagnostic.Create(
+              new DiagnosticDescriptor(
+                  "FastInject004",
+                  "Invalid Constructor Accessibility",
+                  "Service provider constructors must be private or protected. Public constructors are not allowed.",
+                  "DependencyInjection",
+                  DiagnosticSeverity.Error,
+                  true
+              ),
+              declaration.ContainerType.Locations.FirstOrDefault()
+          )
+      );
+    }
+  }
+
 }

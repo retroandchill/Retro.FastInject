@@ -4,6 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
+{{#WithDynamicServices}}
+using Retro.FastInject.Dynamic;    
+{{/WithDynamicServices}}
 
 namespace {{Namespace}};
 
@@ -23,16 +26,27 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
   {{#Singletons}}
   private {{Type}}? {{Name}};     
   {{/Singletons}}
+  {{#WithDynamicServices}}
+  private readonly HybridServiceProvider<{{ClassName}}> _hybridServiceProvider;
+  {{/WithDynamicServices}}
   private readonly List<DisposableWrapper> _disposables = [];
   private bool _disposed;
 
+  {{#WithDynamicServices}}
+  {{#Constructors}}
+  public {{../ClassName}}({{#Params}}{{Type}} {{Name}}, {{/Params}}IServiceCollection serviceCollection) : this({{#Params}}{{Name}}{{^IsLast}}, {{/IsLast}}{{/Params}}) {
+    _hybridServiceProvider = new HybridServiceProvider<{{../ClassName}}>(this, serviceCollection);
+  }    
+  {{/Constructors}}  
+  {{/WithDynamicServices}}
+
   ICompileTimeServiceScope ICompileTimeScopeFactory.GetRootScope() {
-    returns GetRootScope();
+    return GetRootScope();
   }
   
   private Scope GetRootScope() {
     ObjectDisposedException.ThrowIf(_disposed, this);
-    return LazyInitializer.EnsureInitialized(ref _rootScope, () => new Scope(this));
+    return LazyInitializer.EnsureInitialized(ref _rootScope, () => new Scope(this{{#WithDynamicServices}}, _hybridServiceProvider{{/WithDynamicServices}}));
   }
 
   public object? GetService(Type serviceType) {
@@ -45,7 +59,12 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
     {{> ServiceTypeResolution providerInstance='this'}}
     {{/withIndent}}    
 
+    {{#WithDynamicServices}}
+    return _hybridServiceProvider.GetService(serviceType);    
+    {{/WithDynamicServices}}
+    {{^WithDynamicServices}}
     return null;
+    {{/WithDynamicServices}}
   }
   
   {{#withIndent '  '}}
@@ -60,7 +79,12 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
       {{/KeyedServices}}
     }
     
+    {{#WithDynamicServices}}
+    return _hybridServiceProvider.GetKeyedService(serviceType, serviceKey);    
+    {{/WithDynamicServices}}
+    {{^WithDynamicServices}}
     return null;
+    {{/WithDynamicServices}}
   }
 
   public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
@@ -83,7 +107,7 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
   public IServiceScope CreateScope() {
     ObjectDisposedException.ThrowIf(_disposed, this);
-    return new Scope(this);
+    return new Scope(this{{#WithDynamicServices}}, _hybridServiceProvider{{/WithDynamicServices}});
   }
 
   public void TryAddDisposable(object instance) {
@@ -150,13 +174,17 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
     {{#Scoped}}
     private {{Type}}? {{Name}};     
     {{/Scoped}}
+    {{#WithDynamicServices}}
+    private readonly HybridServiceProvider<{{ClassName}}>.Scope _hybridServiceScope;    
+    {{/WithDynamicServices}}
     private readonly List<DisposableWrapper> _disposables = [];
     private bool _disposed;
 
     public IServiceProvider ServiceProvider => this;
     
-    public Scope(SampleServiceProvider root) {
+    public Scope(SampleServiceProvider root{{#WithDynamicServices}}, HybridServiceProvider<{{ClassName}}> hybridServiceProvider{{/WithDynamicServices}}) {
       _root = root;
+      _hybridServiceScope = hybridServiceProvider.CreateScope(this); 
     }
 
     public object? GetService(Type serviceType) {
@@ -173,7 +201,12 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
       {{> ServiceTypeResolution providerInstance='this'}}
       {{/withIndent}}
       
+      {{#WithDynamicServices}}
+      return _hybridServiceScope.GetService(serviceType);    
+      {{/WithDynamicServices}}
+      {{^WithDynamicServices}}
       return null;
+      {{/WithDynamicServices}}
     }
     
     {{#withIndent '    '}}
@@ -188,7 +221,12 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
         {{/KeyedServices}}
       }
     
+      {{#WithDynamicServices}}
+      return _hybridServiceScope.GetKeyedService(serviceType, serviceKey);    
+      {{/WithDynamicServices}}
+      {{^WithDynamicServices}}
       return null;
+      {{/WithDynamicServices}}
     }
 
     public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
