@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using Retro.FastInject.Annotations;
-using Retro.FastInject.ServiceHierarchy;
+using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Tests.Utils;
 
 namespace Retro.FastInject.Tests.ServiceHierarchy;

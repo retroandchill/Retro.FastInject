@@ -5,7 +5,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Retro.FastInject.Annotations;
-using Retro.FastInject.ServiceHierarchy;
+using Retro.FastInject.Comparers;
+using Retro.FastInject.Generation;
+using Retro.FastInject.Model.Template;
 using Retro.FastInject.Utils;
 
 namespace Retro.FastInject;

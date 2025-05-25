@@ -7,9 +7,11 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Comparers;
+using Retro.FastInject.Generation;
 using Retro.FastInject.Utils;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Model.Manifest;
 
 /// <summary>
 /// Represents a manifest for managing service registrations, dependencies, and resolutions.

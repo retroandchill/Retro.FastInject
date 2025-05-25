@@ -1,8 +1,7 @@
-﻿using Dunet;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Model.Detection;
 
 /// <summary>
 /// Represents the declaration of a service within the dependency injection hierarchy.

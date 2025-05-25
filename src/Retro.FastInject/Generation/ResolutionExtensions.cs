@@ -1,4 +1,6 @@
-﻿namespace Retro.FastInject.ServiceHierarchy;
+﻿using Retro.FastInject.Model.Manifest;
+
+namespace Retro.FastInject.Generation;
 
 /// <summary>
 /// Provides extension methods for resolving and manipulating parameter resolution details

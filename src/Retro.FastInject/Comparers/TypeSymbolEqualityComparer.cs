@@ -1,8 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Comparers;
 
 /// Provides a mechanism to compare instances of ITypeSymbol for equality and hashing purposes,
 /// using the default SymbolEqualityComparer from the Microsoft.CodeAnalysis namespace.

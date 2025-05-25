@@ -4,7 +4,7 @@ using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Utils;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Model.Manifest;
 
 /// <summary>
 /// Represents a service registration within the dependency injection framework.

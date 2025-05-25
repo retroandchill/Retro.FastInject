@@ -2,9 +2,10 @@
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Utils;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Model.Template;
 
 /// <summary>
 /// Represents a service injection that is used to hold details about a service

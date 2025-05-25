@@ -1,4 +1,6 @@
-﻿namespace Retro.FastInject.ServiceHierarchy;
+﻿using Retro.FastInject.Model.Manifest;
+
+namespace Retro.FastInject.Model.Template;
 
 /// <summary>
 /// Represents a service collected during registration processing in a dependency injection setup.

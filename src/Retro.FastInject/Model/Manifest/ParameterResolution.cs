@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
-
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Model.Manifest;
 
 /// <summary>
 /// Records a service resolution for a constructor parameter.

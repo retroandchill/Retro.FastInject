@@ -1,7 +1,8 @@
 ﻿using System.Linq;
 using Microsoft.CodeAnalysis;
+using Retro.FastInject.Model.Manifest;
 
-namespace Retro.FastInject.ServiceHierarchy;
+namespace Retro.FastInject.Generation;
 
 /// <summary>
 /// Responsible for generating a service manifest that organizes and maps services, their implementations,
