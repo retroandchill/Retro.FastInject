@@ -34,8 +34,10 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
   {{#WithDynamicServices}}
   {{#Constructors}}
-  public {{../ClassName}}({{#Params}}{{Type}} {{Name}}, {{/Params}}IServiceCollection serviceCollection) : this({{#Params}}{{Name}}{{^IsLast}}, {{/IsLast}}{{/Params}}) {
+  public {{../ClassName}}({{#Params}}{{Type}} {{Name}}, {{/Params}}IServiceCollection serviceCollection){{#IsExplicit}} : this({{#Params}}{{Name}}{{^IsLast}}, {{/IsLast}}{{/Params}}){{/IsExplicit}} {
+    {{#WithDynamicServices}}
     _hybridServiceProvider = new HybridServiceProvider<{{../ClassName}}>(this, serviceCollection);
+    {{/WithDynamicServices}}
   }    
   {{/Constructors}}  
   {{/WithDynamicServices}}
@@ -170,7 +172,7 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
                        {{/KeyedServices}}
                        ICompileTimeServiceScope {
     
-    private readonly SampleServiceProvider _root;
+    private readonly {{ClassName}} _root;
     {{#Scoped}}
     private {{Type}}? {{Name}};     
     {{/Scoped}}
@@ -182,9 +184,11 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
     public IServiceProvider ServiceProvider => this;
     
-    public Scope(SampleServiceProvider root{{#WithDynamicServices}}, HybridServiceProvider<{{ClassName}}> hybridServiceProvider{{/WithDynamicServices}}) {
+    public Scope({{ClassName}} root{{#WithDynamicServices}}, HybridServiceProvider<{{ClassName}}> hybridServiceProvider{{/WithDynamicServices}}) {
       _root = root;
+      {{#WithDynamicServices}}
       _hybridServiceScope = hybridServiceProvider.CreateScope(this); 
+      {{/WithDynamicServices}}
     }
 
     public object? GetService(Type serviceType) {

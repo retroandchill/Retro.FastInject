@@ -144,6 +144,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         WithDynamicServices = services.AllowDynamicServices,
         Constructors = services.ContainerType.Constructors
             .Select(x => new {
+              IsExplicit = !x.IsImplicitlyDeclared,  
               Params = x.Parameters.Select((p, i) => new {
                   Type = p.Type.ToDisplayString(),
                   p.Name,
@@ -208,7 +209,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var template = handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
 
     var templateResult = template(templateParams);
-    context.AddSource("ServiceProvider.g.cs", templateResult);
+    context.AddSource($"{classSymbol.Name}.g.cs", templateResult);
 
     Console.WriteLine(manifest.ToString());
   }
@@ -219,7 +220,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     }
     
     var publicConstructors = declaration.ContainerType.Constructors
-        .Where(c => c.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal);
+        .Where(c => c.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal && !c.IsImplicitlyDeclared);
     
     if (publicConstructors.Any()) {
       context.ReportDiagnostic(

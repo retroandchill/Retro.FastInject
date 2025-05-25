@@ -121,17 +121,16 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     return new Scope(this, compileTimeServiceScope);
   }
 
-  private object? ResolveService(ServiceDescriptor descriptor, Scope currentScope, 
-                                 ICompileTimeServiceProvider serviceProvider) {
+  private object? ResolveService(ServiceDescriptor descriptor, Scope currentScope, ICompileTimeServiceProvider root) {
     switch (descriptor.Lifetime) {
       case ServiceLifetime.Singleton when _singletonInstances.TryGetValue(descriptor, out var instance):
         return instance;
       case ServiceLifetime.Singleton: {
-        var service = CreateServiceInstance(descriptor, serviceProvider);
+        var service = CreateServiceInstance(descriptor, currentScope.CompileTimeScope);
         if (service is null) return service;
 
         _singletonInstances[descriptor] = service;
-        serviceProvider.TryAddDisposable(service);
+        root.TryAddDisposable(service);
         return service;
       }
       case ServiceLifetime.Scoped:
@@ -139,9 +138,9 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       case ServiceLifetime.Transient:
       default: {
         // Transient
-        var service = CreateServiceInstance(descriptor, serviceProvider);
+        var service = CreateServiceInstance(descriptor, currentScope.CompileTimeScope);
         if (service is not null) {
-          serviceProvider.TryAddDisposable(service);
+          currentScope.TryAddDisposable(service);
         }
         return service;
       }
@@ -212,8 +211,9 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
   /// </summary>
   public sealed class Scope : IKeyedServiceProvider {
     private readonly HybridServiceProvider<T> _hybridServiceProvider;
-    private readonly ICompileTimeServiceScope _compileTimeScope;
     private readonly Dictionary<ServiceDescriptor, object> _scopedInstances = new();
+    
+    internal ICompileTimeServiceScope CompileTimeScope { get; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Scope"/> class.
@@ -222,7 +222,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     /// <param name="scope">The compile time service provider's scope.</param>
     public Scope(HybridServiceProvider<T> hybridServiceProvider, ICompileTimeServiceScope scope) {
       _hybridServiceProvider = hybridServiceProvider;
-      _compileTimeScope = scope;
+      CompileTimeScope = scope;
     }
 
     /// <summary>
@@ -243,7 +243,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
       // Always use the last registered service when multiple registrations exist
       var descriptor = descriptors[^1];
-      return _hybridServiceProvider.ResolveService(descriptor, this, _compileTimeScope);
+      return _hybridServiceProvider.ResolveService(descriptor, this, _hybridServiceProvider._compileTimeServiceProvider);
 
     }
 
@@ -264,7 +264,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
       // Always use the last registered service when multiple registrations exist
       var descriptor = descriptors[^1];
-      return _hybridServiceProvider.ResolveService(descriptor, this, _compileTimeScope);
+      return _hybridServiceProvider.ResolveService(descriptor, this, _hybridServiceProvider._compileTimeServiceProvider);
 
     }
 
@@ -289,12 +289,16 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
         return instance;
       }
 
-      var service = CreateServiceInstance(descriptor, _compileTimeScope);
+      var service = CreateServiceInstance(descriptor, CompileTimeScope);
       if (service is null) return service;
 
       _scopedInstances[descriptor] = service;
-      _compileTimeScope.TryAddDisposable(service);
+      CompileTimeScope.TryAddDisposable(service);
       return service;
+    }
+    
+    internal void TryAddDisposable(object instance) {
+      CompileTimeScope.TryAddDisposable(instance);
     }
   }
 }
