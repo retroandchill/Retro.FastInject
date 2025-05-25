@@ -5,8 +5,8 @@ using Retro.FastInject.Sample.Services;
 
 var serviceCollection = new ServiceCollection();
 serviceCollection.AddSingleton<IDynamicService, DynamicService>();
-var serviceProvider = new SampleServiceProvider(4, 5.0f, serviceCollection);
+using var serviceProvider = new SampleServiceProvider(4, 5.0f, serviceCollection);
 var singleton = serviceProvider.GetService<ISingletonService>();
 using var scope = serviceProvider.CreateScope();
-var scopedService = serviceProvider.GetService<IScopedService>();
+var scopedService = scope.ServiceProvider.GetService<IScopedService>();
 Console.WriteLine("Hello World!");
