@@ -20,6 +20,7 @@ public static class ResolutionExtensions {
   /// <summary>
   /// Checks if all dependencies in the constructor of the specified service registration can be resolved and records the resolution.
   /// </summary>
+  /// <param name="serviceManifest">The service manifest to validate.</param>
   /// <param name="declaration">The service registration representing the type and its associated symbol to check.</param>
   /// <param name="compilation">The Roslyn compilation providing semantic analysis for the type and its dependencies.</param>
   /// <exception cref="InvalidOperationException">
