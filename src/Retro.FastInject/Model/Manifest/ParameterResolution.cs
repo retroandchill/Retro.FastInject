@@ -57,7 +57,11 @@ public record ParameterResolution {
   /// Indicates whether the parameter has multiple service registrations available for resolution.
   /// </summary>
   public bool HasMultipleRegistrations { get; set; }
-  
+
+  /// <summary>
+  /// Indicates whether the resolution creates a lazy transient cycle, which occurs when a lazily
+  /// resolved service depends on another transient service, creating an unresolved dependency loop.
+  /// </summary>
   public bool CreatesLazyTransientCycle { get; set; }
 
   /// <summary>

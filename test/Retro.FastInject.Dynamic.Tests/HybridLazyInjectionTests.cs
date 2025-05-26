@@ -29,7 +29,7 @@ public class CompileTimeServiceA(Lazy<CompileTimeServiceB> serviceB, [AllowDynam
 public class CompileTimeServiceB(CompileTimeServiceA serviceA, [AllowDynamic] Lazy<RuntimeServiceB> runtimeServiceB) {
 
   public Lazy<RuntimeServiceB> RuntimeServiceB { get; } = runtimeServiceB;
-  
+
   public string GetValue() => "Value from CompileTimeServiceB";
 
   public string GetValueFromA() => serviceA.GetValue();
@@ -112,9 +112,11 @@ public class HybridLazyInjectionTests {
     var compileTimeServiceA = provider.GetService<CompileTimeServiceA>();
     var runtimeServiceA = provider.GetService<RuntimeServiceA>();
 
-    // Assert
-    Assert.That(compileTimeServiceA, Is.Not.Null);
-    Assert.That(runtimeServiceA, Is.Not.Null);
+    Assert.Multiple(() => {
+      // Assert
+      Assert.That(compileTimeServiceA, Is.Not.Null);
+      Assert.That(runtimeServiceA, Is.Not.Null);
+    });
 
     // Test circular dependencies between compile-time and runtime services
     var compileTimeValueFromRuntime = compileTimeServiceA.GetValueFromRuntimeA();
