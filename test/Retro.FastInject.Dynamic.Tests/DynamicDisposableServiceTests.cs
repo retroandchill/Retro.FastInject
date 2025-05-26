@@ -9,9 +9,9 @@ namespace Retro.FastInject.Dynamic.Tests;
 [ServiceProvider(AllowDynamicRegistrations = true)]
 [Singleton<CompileTimeDisposableService>]
 [Scoped<ScopedCompileTimeDisposableService>]
-public partial class TestDisposableHybridServiceProvider;
+public sealed partial class TestDisposableHybridServiceProvider;
 
-public class CompileTimeDisposableService : IDisposable {
+public sealed class CompileTimeDisposableService : IDisposable {
   public bool IsDisposed { get; private set; }
 
   public void Dispose() {
@@ -19,7 +19,7 @@ public class CompileTimeDisposableService : IDisposable {
   }
 }
 
-public class ScopedCompileTimeDisposableService : IDisposable {
+public sealed class ScopedCompileTimeDisposableService : IDisposable {
   public bool IsDisposed { get; private set; }
 
   public void Dispose() {
@@ -27,7 +27,7 @@ public class ScopedCompileTimeDisposableService : IDisposable {
   }
 }
 
-public class DynamicDisposableService : IDisposable {
+public sealed class DynamicDisposableService : IDisposable {
   public bool IsDisposed { get; private set; }
 
   public void Dispose() {
@@ -35,7 +35,7 @@ public class DynamicDisposableService : IDisposable {
   }
 }
 
-public class DynamicAsyncDisposableService : IAsyncDisposable {
+public sealed class DynamicAsyncDisposableService : IAsyncDisposable {
   public bool IsDisposed { get; private set; }
 
   public ValueTask DisposeAsync() {
@@ -44,7 +44,7 @@ public class DynamicAsyncDisposableService : IAsyncDisposable {
   }
 }
 
-public class DynamicDoubleDisposableService : IDisposable, IAsyncDisposable {
+public sealed class DynamicDoubleDisposableService : IDisposable, IAsyncDisposable {
   public bool IsDisposed { get; private set; }
   public bool IsAsyncDisposed { get; private set; }
 
@@ -58,7 +58,7 @@ public class DynamicDoubleDisposableService : IDisposable, IAsyncDisposable {
   }
 }
 
-public class ScopedDynamicDisposableService : IDisposable {
+public sealed class ScopedDynamicDisposableService : IDisposable {
   public bool IsDisposed { get; private set; }
 
   public void Dispose() {

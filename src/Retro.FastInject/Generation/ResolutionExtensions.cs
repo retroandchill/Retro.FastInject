@@ -232,6 +232,15 @@ public static class ResolutionExtensions {
       
     return true;
   }
+
+  /// <summary>
+  /// Determines whether the specified generic type is a generic collection type, such as IEnumerable&lt;T>,
+  /// IReadOnlyCollection&lt;T>, IReadOnlyList&lt;T>, or ImmutableArray&lt;T>.
+  /// </summary>
+  /// <param name="genericType">The named type symbol representing the generic type to check.</param>
+  /// <returns>
+  /// True if the specified type is a generic collection type; otherwise, false.
+  /// </returns>
   public static bool IsGenericCollectionType(this INamedTypeSymbol genericType) {
     return genericType.ConstructedFrom.ToDisplayString() is "System.Collections.Generic.IEnumerable<T>" or
         "System.Collections.Generic.IReadOnlyCollection<T>" or

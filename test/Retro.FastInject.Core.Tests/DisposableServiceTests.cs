@@ -11,9 +11,9 @@ namespace Retro.FastInject.Core.Tests;
 [Singleton<AsyncDisposableService>]
 [Singleton<DoubleDisposableService>]
 [Scoped<ScopedDisposableService>]
-public partial class TestDisposableServiceProvider;
+public sealed partial class TestDisposableServiceProvider;
 
-public class DisposableService : IDisposable {
+public sealed class DisposableService : IDisposable {
   public bool IsDisposed { get; private set; }
 
   public void Dispose() {
@@ -21,7 +21,7 @@ public class DisposableService : IDisposable {
   }
 }
 
-public class AsyncDisposableService : IAsyncDisposable {
+public sealed class AsyncDisposableService : IAsyncDisposable {
   public bool IsDisposed { get; private set; }
 
   public ValueTask DisposeAsync() {
@@ -30,7 +30,7 @@ public class AsyncDisposableService : IAsyncDisposable {
   }
 }
 
-public class DoubleDisposableService : IDisposable, IAsyncDisposable {
+public sealed class DoubleDisposableService : IDisposable, IAsyncDisposable {
   public bool IsDisposed { get; private set; }
   public bool IsAsyncDisposed { get; private set; }
 
@@ -44,7 +44,7 @@ public class DoubleDisposableService : IDisposable, IAsyncDisposable {
   }
 }
 
-public class ScopedDisposableService : IDisposable {
+public sealed class ScopedDisposableService : IDisposable {
   public bool IsDisposed { get; private set; }
 
   public void Dispose() {

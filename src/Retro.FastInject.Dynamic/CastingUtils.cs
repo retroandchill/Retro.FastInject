@@ -9,7 +9,7 @@ namespace Retro.FastInject.Dynamic;
 /// Provides utility methods for casting and creating immutable arrays.
 /// </summary>
 public static class CastingUtils {
-  private static readonly MethodInfo EnumerableCast = typeof(Enumerable).GetMethod("Cast") ?? throw new Exception();
+  private static readonly MethodInfo EnumerableCast = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast))!;
   private static readonly MethodInfo ImmutableArrayToImmutableArray = typeof(ImmutableArray).GetMethods()
       .Single(x => x is {
           Name: "ToImmutableArray",

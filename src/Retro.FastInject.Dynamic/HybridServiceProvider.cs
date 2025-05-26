@@ -22,10 +22,17 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
 
   /// <summary>
-  /// A dynamic service provider that resolves services from an <see cref="IServiceCollection"/>
-  /// and integrates with a compile-time service provider.
+  /// Provides a hybrid service provider implementation that supports both compile-time and runtime service resolution.
   /// </summary>
-  /// <typeparam name="T">A type implementing <see cref="ICompileTimeServiceProvider"/> and <see cref="ICompileTimeScopeFactory"/>.</typeparam>
+  /// <param name="compileTimeServiceProvider">
+  /// An instance of the compile-time service provider.
+  /// </param>
+  /// <param name="services">
+  /// A collection of service descriptors used for runtime service registrations.
+  /// </param>
+  /// <exception cref="ArgumentNullException">
+  /// Thrown when either <paramref name="compileTimeServiceProvider"/> or <paramref name="services"/> is null.
+  /// </exception>
   public HybridServiceProvider(T compileTimeServiceProvider, IServiceCollection services) {
     ArgumentNullException.ThrowIfNull(compileTimeServiceProvider);
     ArgumentNullException.ThrowIfNull(services);
@@ -239,49 +246,52 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     }
     
     try {
-      // Find constructor with the most parameters that we can resolve
-      var constructors = implementationType.GetConstructors()
-          .OrderByDescending(c => c.GetParameters().Length)
-          .ToList();
-
-      foreach (var constructor in constructors) {
-        var parameters = constructor.GetParameters();
-        var parameterInstances = new object?[parameters.Length];
-        var canResolveAll = true;
-
-        for (var i = 0; i < parameters.Length; i++) {
-          var parameter = parameters[i];
-
-          // Check if the parameter is a keyed service
-          var keyedServiceAttribute = parameter.GetCustomAttribute<FromKeyedServicesAttribute>();
-
-          object? parameterInstance;
-          if (keyedServiceAttribute is not null) {
-            // Extract the key value from the attribute
-            var key = keyedServiceAttribute.Key;
-            parameterInstance = currentScope.GetKeyedService(parameter.ParameterType, key);
-          } else {
-            parameterInstance = currentScope.GetService(parameter.ParameterType);
-          }
-
-          if (parameterInstance is null && !parameter.IsOptional) {
-            canResolveAll = false;
-            break;
-          }
-          
-          parameterInstances[i] = parameterInstance ?? parameter.DefaultValue;
-        }
-
-        if (canResolveAll) {
-          return constructor.Invoke(parameterInstances);
-        }
-      }
-
-      // If no constructor works, try to create with default constructor
-      return Activator.CreateInstance(implementationType);
+      return ResolveConstructorParameters(currentScope, implementationType);
     } catch (Exception ex) {
       throw new InvalidOperationException($"Error resolving service '{descriptor.ServiceType}'", ex);
     }
+  }
+  private static object? ResolveConstructorParameters(ICompileTimeServiceProvider currentScope, Type implementationType) {
+    // Find constructor with the most parameters that we can resolve
+    var constructors = implementationType.GetConstructors()
+        .OrderByDescending(c => c.GetParameters().Length)
+        .ToList();
+
+    foreach (var constructor in constructors) {
+      var parameters = constructor.GetParameters();
+      var parameterInstances = new object?[parameters.Length];
+      var canResolveAll = true;
+
+      for (var i = 0; i < parameters.Length; i++) {
+        var parameter = parameters[i];
+
+        // Check if the parameter is a keyed service
+        var keyedServiceAttribute = parameter.GetCustomAttribute<FromKeyedServicesAttribute>();
+
+        object? parameterInstance;
+        if (keyedServiceAttribute is not null) {
+          // Extract the key value from the attribute
+          var key = keyedServiceAttribute.Key;
+          parameterInstance = currentScope.GetKeyedService(parameter.ParameterType, key);
+        } else {
+          parameterInstance = currentScope.GetService(parameter.ParameterType);
+        }
+
+        if (parameterInstance is null && !parameter.IsOptional) {
+          canResolveAll = false;
+          break;
+        }
+          
+        parameterInstances[i] = parameterInstance ?? parameter.DefaultValue;
+      }
+
+      if (canResolveAll) {
+        return constructor.Invoke(parameterInstances);
+      }
+    }
+
+    // If no constructor works, try to create with default constructor
+    return Activator.CreateInstance(implementationType);
   }
 
   /// <summary>

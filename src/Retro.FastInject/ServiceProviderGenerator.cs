@@ -22,6 +22,7 @@ namespace Retro.FastInject;
 /// </remarks>
 [Generator]
 public class ServiceProviderGenerator : IIncrementalGenerator {
+  private const string DependencyInjection = "DependencyInjection";
   /// <inheritdoc />
   public void Initialize(IncrementalGeneratorInitializationContext context) {
     // Get all class declarations with [ServiceProvider] attribute
@@ -63,7 +64,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                 "FastInject001",
                                 "Dependency Injection Error",
                                 $"Class {classSymbol.Name} must be declared partial",
-                                "DependencyInjection",
+                                DependencyInjection,
                                 DiagnosticSeverity.Error,
                                 true
                             ),
@@ -86,7 +87,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                          "FastInject002",
                                          "Dependency Injection Error",
                                          ex.Message,
-                                         "DependencyInjection",
+                                         DependencyInjection,
                                          DiagnosticSeverity.Error,
                                          true
                                      ),
@@ -104,7 +105,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                      "FastInject003",
                                      "Circular Dependency Error",
                                      ex.Message,
-                                     "DependencyInjection",
+                                     DependencyInjection,
                                      DiagnosticSeverity.Error,
                                      true
                                  ),
@@ -230,7 +231,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                   "FastInject004",
                   "Invalid Constructor Accessibility",
                   "Service provider constructors must be private or protected. Public constructors are not allowed.",
-                  "DependencyInjection",
+                  DependencyInjection,
                   DiagnosticSeverity.Error,
                   true
               ),
