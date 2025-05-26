@@ -19,13 +19,6 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
   private readonly Dictionary<Type, Dictionary<object, List<ServiceDescriptor>>> _keyedDescriptors = new();
   private readonly Dictionary<ServiceDescriptor, object> _singletonInstances = new();
   private readonly T _compileTimeServiceProvider;
-  
-  private static readonly MethodInfo EnumerableCast = typeof(Enumerable).GetMethod("Cast") ?? throw new Exception();
-  private static readonly MethodInfo ImmutableArrayToImmutableArray = typeof(ImmutableArray).GetMethods()
-      .Single(x => x is {
-          Name: "ToImmutableArray",
-          IsGenericMethodDefinition: true
-      } && x.GetParameters()[0].ParameterType.GetGenericTypeDefinition() == typeof(IEnumerable<>));
 
 
   /// <summary>
@@ -120,7 +113,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
     // Get all registered services of the element type
     if (!serviceProvider._descriptors.TryGetValue(elementType, out var descriptors) || descriptors.Count <= 0) {
-      asReadOnly = CreateEmptyArray(elementType);
+      asReadOnly = elementType.CreateEmptyArray();
       return true;
     }
     
@@ -133,24 +126,14 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     return ResolveFoundServices(serviceType, services, elementType, out asReadOnly);
 
   }
-  private static object? CreateEmptyArray(Type elementType) {
-    var immutableArrayType = typeof(ImmutableArray<>).MakeGenericType(elementType);
-    var constructor = immutableArrayType.GetConstructor(Type.EmptyTypes);
-    if (constructor is null) throw new InvalidOperationException($"Cannot create immutable array of type '{immutableArrayType}'");
-    return constructor.Invoke(null);
-  }
   
   private static bool ResolveFoundServices(Type serviceType, IEnumerable<object?> services, 
                                            Type elementType, out object? asReadOnly) {
-    var castMethod = EnumerableCast.MakeGenericMethod(elementType);
-    var castServices = castMethod.Invoke(null, [services]);
-    if (castServices is null) throw new InvalidOperationException($"Cannot cast services of type '{serviceType}' to type '{elementType}'");
+    var castServices = services.CastEnumerable(serviceType);
           
-    // If it's specifically ImmutableArray<T>, return the immutable array directly
-    if (serviceType.GetGenericTypeDefinition() == typeof(ImmutableArray<>)) {
-      var toImmutableArrayMethod = ImmutableArrayToImmutableArray.MakeGenericMethod(elementType);
-      asReadOnly = toImmutableArrayMethod.Invoke(null, [castServices]);
-      if (asReadOnly is null) throw new InvalidOperationException($"Cannot create immutable array of type '{serviceType}'");
+    // If it's an actual collection type, return the array directly
+    if (serviceType.GetGenericTypeDefinition() != typeof(IEnumerable<>)) {
+      asReadOnly = castServices.CastImmutableArray(elementType);
       return true;
     }
       
@@ -170,9 +153,6 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       return GetService(serviceType);
     }
 
-    if (CheckKeyedCollectionInjection(this, GetRootScope(), serviceType, 
-            serviceKey, out var asReadOnly)) return asReadOnly;
-
     if (!_keyedDescriptors.TryGetValue(serviceType, out var keyedServices) ||
         !keyedServices.TryGetValue(serviceKey, out var descriptors) ||
         descriptors.Count <= 0) return null;
@@ -180,30 +160,6 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     // Always use the last registered service when multiple registrations exist
     var descriptor = descriptors[^1];
     return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
-  }
-  private static bool CheckKeyedCollectionInjection(HybridServiceProvider<T> serviceProvider, 
-                                                    Scope currentScope, Type serviceType, 
-                                                    object serviceKey, out object? asReadOnly) {
-    asReadOnly = null;
-    // Check if this is a collection type
-    if (!IsCollectionType(serviceType, out var elementType)) {
-      return false;
-    }
-
-    // For collection types with a key, we return all services of that element type with the given key
-    if (!serviceProvider._keyedDescriptors.TryGetValue(elementType, out var keyedServices) ||
-        !keyedServices.TryGetValue(serviceKey, out var descriptors) ||
-        descriptors.Count <= 0) {
-      asReadOnly = CreateEmptyArray(elementType);
-      return true;
-    }
-    
-    // Create an array of all services
-    var services = descriptors
-        .Select(descriptor => serviceProvider.ResolveService(descriptor, currentScope, serviceProvider._compileTimeServiceProvider))
-        .Where(service => service != null);  
-    
-    return ResolveFoundServices(serviceType, services, elementType, out asReadOnly);
   }
 
   /// <summary>
@@ -382,8 +338,6 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       if (serviceKey is null) {
         return GetService(serviceType);
       }
-
-      if (CheckKeyedCollectionInjection(_hybridServiceProvider, this, serviceType, serviceKey, out var asReadOnly)) return asReadOnly;
 
       if (!_hybridServiceProvider._keyedDescriptors.TryGetValue(serviceType, out var keyedServices) ||
           !keyedServices.TryGetValue(serviceKey, out var descriptors) ||

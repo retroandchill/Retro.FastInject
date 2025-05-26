@@ -80,6 +80,8 @@ public class MixedPluginConsumer {
   }
 }
 
+public interface IUnusedPlugin;
+
 /// <summary>
 /// Tests for enumerable service injection in hybrid service providers.
 /// </summary>
@@ -174,5 +176,21 @@ public class HybridEnumerableServiceTests {
       Assert.That(names, Contains.Item("Dynamic Plugin A"));
       Assert.That(names, Contains.Item("Dynamic Plugin B"));
     });
+  }
+  
+  [Test]
+  public void GetService_EnumerableOfUnusedType_ReturnsEmptyArray() {
+    // Arrange
+    var services = new ServiceCollection();
+    services.AddSingleton<IPlugin, DynamicPluginA>();
+    services.AddSingleton<IPlugin, DynamicPluginB>();
+    var provider = new TestHybridEnumerableServiceProvider(services);
+
+    // Act
+    var plugins = provider.GetService<IEnumerable<IUnusedPlugin>>()?.ToList();
+
+    // Assert
+    Assert.That(plugins, Is.Not.Null);
+    Assert.That(plugins, Has.Count.EqualTo(0), "Should not find any plugins");
   }
 }
