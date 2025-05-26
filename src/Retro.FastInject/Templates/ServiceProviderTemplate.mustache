@@ -75,6 +75,11 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
     ObjectDisposedException.ThrowIf(_disposed, this);
+
+    if (serviceKey is null) {
+      return GetService(serviceType);
+    }
+
     {{#WithDynamicServices}}
     var resolvedService = ResolveKeyedService(serviceType, serviceKey);
     if (resolvedService is not null) {
@@ -227,6 +232,11 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
       ObjectDisposedException.ThrowIf(_disposed, this);  
+
+      if (serviceKey is null) {
+        return GetService(serviceType);
+      }
+
       {{#WithDynamicServices}}
       var resolvedService = ResolveKeyedService(serviceType, serviceKey);
       if (resolvedService is not null) {
