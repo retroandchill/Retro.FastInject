@@ -5,7 +5,7 @@
 {{~^SelectedService~}}
 {{~#HasDefaultValue~}}
 {{~#UseDynamic~}}
-{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ParameterType}}>() ?? {{DefaultValue}}{{~/UseDynamic~}}
+{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.{{#WithKey}}GetKeyedService<{{ParameterType}}>("{{Key}}"){{/WithKey}}{{^WithKey}}GetService<{{ParameterType}}>(){{/WithKey}} ?? {{DefaultValue}}{{~/UseDynamic~}}
 {{~^UseDynamic~}}{{DefaultValue}}{{~/UseDynamic~}}
 {{~/HasDefaultValue~}}
 {{~^HasDefaultValue~}}

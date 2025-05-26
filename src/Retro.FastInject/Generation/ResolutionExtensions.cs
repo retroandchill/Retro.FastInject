@@ -253,6 +253,8 @@ public static class ResolutionExtensions {
     selectedService = serviceManifest.AddService(immutableArrayType, ServiceScope.Transient,
         collectedServices: elementServices
             .Select(serviceManifest.ResolveConcreteType)
+            .Where(x => x.Type is not INamedTypeSymbol { IsGenericType: true } genericType 
+                        || genericType.TypeArguments.All(y => y is not ITypeParameterSymbol))
             .ToList());
     var readOnlyListType = typeof(IReadOnlyList<>).GetInstantiatedGeneric(compilation, elementType);
     serviceManifest.AddService(readOnlyListType, ServiceScope.Transient, immutableArrayType);

@@ -35,9 +35,7 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
   {{#WithDynamicServices}}
   {{#Constructors}}
   public {{../ClassName}}({{#Params}}{{Type}} {{Name}}, {{/Params}}IServiceCollection serviceCollection){{#IsExplicit}} : this({{#Params}}{{Name}}{{^IsLast}}, {{/IsLast}}{{/Params}}){{/IsExplicit}} {
-    {{#WithDynamicServices}}
     _hybridServiceProvider = new HybridServiceProvider<{{../ClassName}}>(this, serviceCollection);
-    {{/WithDynamicServices}}
   }    
   {{/Constructors}}  
   {{/WithDynamicServices}}
@@ -75,18 +73,26 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
     ObjectDisposedException.ThrowIf(_disposed, this);
+    {{#WithDynamicServices}}
+    var resolvedService = ResolveKeyedService(serviceType, serviceKey);
+    if (resolvedService is not null) {
+      return resolvedService;
+    }
+    return _hybridServiceProvider.GetKeyedService(serviceType, serviceKey);    
+    {{/WithDynamicServices}}
+    {{^WithDynamicServices}}
+    return ResolveKeyedService(serviceType, serviceKey);
+    {{/WithDynamicServices}}
+  }
+
+  private object? ResolveKeyedService(Type serviceType, object? serviceKey) {
     if (serviceKey is string asString) {
       {{#KeyedServices}}
       if (serviceType == typeof({{ServiceType}})) return ((IKeyedServiceProvider<{{ServiceType}}>) this).GetKeyedService(asString);
       {{/KeyedServices}}
     }
-    
-    {{#WithDynamicServices}}
-    return _hybridServiceProvider.GetKeyedService(serviceType, serviceKey);    
-    {{/WithDynamicServices}}
-    {{^WithDynamicServices}}
+
     return null;
-    {{/WithDynamicServices}}
   }
 
   public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
@@ -219,18 +225,26 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
 
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
       ObjectDisposedException.ThrowIf(_disposed, this);  
+      {{#WithDynamicServices}}
+      var resolvedService = ResolveKeyedService(serviceType, serviceKey);
+      if (resolvedService is not null) {
+        return resolvedService;
+      }
+      return _hybridServiceScope.GetKeyedService(serviceType, serviceKey);    
+      {{/WithDynamicServices}}
+      {{^WithDynamicServices}}
+      return ResolveKeyedService(serviceType, serviceKey);
+      {{/WithDynamicServices}}
+    }
+
+    private object? ResolveKeyedService(Type serviceType, object? serviceKey) {
       if (serviceKey is string asString) {
         {{#KeyedServices}}
         if (serviceType == typeof({{ServiceType}})) return ((IKeyedServiceProvider<{{ServiceType}}>) this).GetKeyedService(asString);
         {{/KeyedServices}}
       }
-    
-      {{#WithDynamicServices}}
-      return _hybridServiceScope.GetKeyedService(serviceType, serviceKey);    
-      {{/WithDynamicServices}}
-      {{^WithDynamicServices}}
+      
       return null;
-      {{/WithDynamicServices}}
     }
 
     public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {

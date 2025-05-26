@@ -86,9 +86,7 @@ public record ServiceRegistration {
   public string FieldName {
     get {
       var suffix = "";
-      if (Key is not null) {
-        suffix = $"_{Key}";
-      } else if (IndexForType > 0) {
+      if (IndexForType > 0) {
         suffix = $"_{IndexForType}";
       }
 

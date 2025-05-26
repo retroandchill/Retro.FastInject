@@ -24,6 +24,10 @@ public record ParameterInjection
     /// </summary>
     public ResolvedInjection? SelectedService { get; init; }
     
+    public bool WithKey => Key is not null;
+    
+    public string? Key { get; init; }
+    
     public bool HasDefaultValue => DefaultValue is not null;
 
     /// <summary>
@@ -49,6 +53,7 @@ public record ParameterInjection
             ParameterType = parameter.ParameterType.ToDisplayString(),
             ParameterName = parameter.Parameter.Name,
             SelectedService = parameter.SelectedService is not null ? ResolvedInjection.FromRegistration(parameter.SelectedService) : null,
+            Key = parameter.Key,
             DefaultValue = parameter.DefaultValue,
             UseDynamic = parameter.UseDynamic,
             IsNullable = parameter.IsNullable,

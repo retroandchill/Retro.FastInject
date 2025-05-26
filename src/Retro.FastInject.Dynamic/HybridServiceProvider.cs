@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
@@ -149,19 +150,33 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
   private static object? CreateServiceInstance(ServiceDescriptor descriptor, 
                                                ICompileTimeServiceProvider currentScope) {
-    if (descriptor.ImplementationInstance is not null) {
-      return descriptor.ImplementationInstance;
+    Type implementationType;
+    if (descriptor.ServiceKey is not null) {
+      if (descriptor.KeyedImplementationFactory is not null) {
+        return descriptor.KeyedImplementationFactory(currentScope, descriptor.ServiceKey);
+      }
+      
+      if (descriptor.KeyedImplementationInstance is not null) {
+        return descriptor.KeyedImplementationInstance;
+      }
+
+      if (descriptor.KeyedImplementationType is null) return null;
+      implementationType = descriptor.KeyedImplementationType;
+    } else {
+      if (descriptor.ImplementationFactory is not null) {
+        return descriptor.ImplementationFactory(currentScope);
+      }
+      if (descriptor.ImplementationInstance is not null) {
+        return descriptor.ImplementationInstance;
+      }
+      
+      if (descriptor.ImplementationType is null) return null;
+      implementationType = descriptor.ImplementationType;
     }
-
-    if (descriptor.ImplementationFactory is not null) {
-      return descriptor.ImplementationFactory(currentScope);
-    }
-
-    if (descriptor.ImplementationType is null) return null;
-
+    
     try {
       // Find constructor with the most parameters that we can resolve
-      var constructors = descriptor.ImplementationType.GetConstructors()
+      var constructors = implementationType.GetConstructors()
           .OrderByDescending(c => c.GetParameters().Length)
           .ToList();
 
@@ -174,13 +189,12 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
           var parameter = parameters[i];
 
           // Check if the parameter is a keyed service
-          var keyedServiceAttribute = parameter.GetCustomAttributes(true)
-              .FirstOrDefault(a => a.GetType().Name == "FromKeyedServicesAttribute");
+          var keyedServiceAttribute = parameter.GetCustomAttribute<FromKeyedServicesAttribute>();
 
           object? parameterInstance;
           if (keyedServiceAttribute is not null) {
             // Extract the key value from the attribute
-            var key = keyedServiceAttribute.GetType().GetProperty("Key")?.GetValue(keyedServiceAttribute);
+            var key = keyedServiceAttribute.Key;
             parameterInstance = currentScope.GetKeyedService(parameter.ParameterType, key);
           } else {
             parameterInstance = currentScope.GetService(parameter.ParameterType);
@@ -190,8 +204,8 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
             canResolveAll = false;
             break;
           }
-
-          parameterInstances[i] = parameterInstance;
+          
+          parameterInstances[i] = parameter.DefaultValue;
         }
 
         if (canResolveAll) {
@@ -200,7 +214,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       }
 
       // If no constructor works, try to create with default constructor
-      return Activator.CreateInstance(descriptor.ImplementationType);
+      return Activator.CreateInstance(implementationType);
     } catch (Exception ex) {
       throw new InvalidOperationException($"Error resolving service '{descriptor.ServiceType}'", ex);
     }
