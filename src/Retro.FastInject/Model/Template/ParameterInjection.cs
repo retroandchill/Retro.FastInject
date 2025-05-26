@@ -82,13 +82,15 @@ public record ParameterInjection {
   /// A new <see cref="ParameterInjection"/> object populated with data from the provided parameter resolution.
   /// </returns>
   public static ParameterInjection FromResolution(ParameterResolution parameter, bool isLast) {
+    var baseParameterType = parameter.ParameterType is INamedTypeSymbol { IsGenericType: true} genericType && genericType.IsLazyType() ? genericType.TypeArguments[0] : parameter.ParameterType;
+    
     return new ParameterInjection {
-        ParameterType = parameter.ParameterType.ToDisplayString(),
+        ParameterType = baseParameterType.ToDisplayString(),
         ParameterName = parameter.Parameter.Name,
         SelectedService = parameter.SelectedService is not null ? ResolvedInjection.FromRegistration(parameter.SelectedService, parameter.UseDynamic) : null,
         Key = parameter.Key,
         DefaultValue = parameter.DefaultValue,
-        IsCollection = parameter.ParameterType is INamedTypeSymbol namedType && namedType.IsGenericCollectionType(),
+        IsCollection = baseParameterType is INamedTypeSymbol namedType && namedType.IsGenericCollectionType(),
         UseDynamic = parameter.UseDynamic,
         IsLazy = parameter.IsLazy,
         IsNullable = parameter.IsNullable,

@@ -265,8 +265,15 @@ public static class ResolutionExtensions {
         "System.Collections.Generic.IReadOnlyList<T>" or
         "System.Collections.Immutable.ImmutableArray<T>";
   }
-  
-  private static bool IsLazyType(this INamedTypeSymbol genericType) {
+
+  /// <summary>
+  /// Determines if the specified generic type is a lazy type (e.g., System.Lazy&lt;T&gt;).
+  /// </summary>
+  /// <param name="genericType">The generic type to check.</param>
+  /// <returns>
+  /// True if the specified generic type represents a lazy type, otherwise false.
+  /// </returns>
+  public static bool IsLazyType(this INamedTypeSymbol genericType) {
     return genericType.ConstructedFrom.ToDisplayString() is "System.Lazy<T>";
   }
   
@@ -306,13 +313,13 @@ public static class ResolutionExtensions {
                                             ParameterResolution targetParameter,
                                             string? keyName,
                                             [NotNullWhen(true)] out ServiceRegistration? selectedService) {
+    targetParameter.IsLazy = true;
     var elementType = namedType.TypeArguments[0];
     if (!serviceManifest.CanResolve(keyName, elementType, targetParameter, compilation, out var resolvedServiceRegistration)) {
       selectedService = null;
       return false;
     }
-
-    targetParameter.IsLazy = true;
+    
     selectedService = resolvedServiceRegistration;
     return true;
   }

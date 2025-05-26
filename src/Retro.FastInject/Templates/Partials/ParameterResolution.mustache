@@ -1,4 +1,4 @@
-﻿{{~#IsLazy}}new {{ParameterType}}(() => {{/IsLazy~}}
+﻿{{~#IsLazy}}new Lazy<{{ParameterType}}>(() => {{/IsLazy~}}
 {{#SelectedService~}}
 {{~#Index~}}this.Get{{ServiceName}}_{{Index}}(){{~/Index~}}
 {{~^Index~}}((IServiceProvider<{{ServiceType}}>) this).GetService(){{~/Index~}}
