@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Comparers;
 using Retro.FastInject.Utils;
 
 namespace Retro.FastInject.Generation;
@@ -27,14 +28,14 @@ public static class ResolutionExtensions {
   /// Thrown when dependencies cannot be resolved, or when the type has multiple public constructors, or if the type is not a named type.
   /// </exception>
   public static void CheckConstructorDependencies(this ServiceManifest serviceManifest, 
-                                           ServiceRegistration declaration, Compilation compilation) {
+                                                  ServiceRegistration declaration, Compilation compilation) {
     var type = declaration.Type;
     if (type is not INamedTypeSymbol namedTypeSymbol) {
       throw new InvalidOperationException($"Type '{type.ToDisplayString()}' is not a named type.");
     }
 
     var constructor = declaration.AssociatedSymbol switch {
-        IMethodSymbol method => method.ValidateFactoryMethod(),
+        IMethodSymbol method => method.ValidateFactoryMethod(declaration.ResolvedType),
         null => namedTypeSymbol.GetValidConstructor(),
         _ => null
     };
@@ -84,11 +85,30 @@ public static class ResolutionExtensions {
     // Fallback to the first public constructor if there are no explicit constructors
     return publicConstructors.FirstOrDefault();
   }
-  
-  private static IMethodSymbol ValidateFactoryMethod(this IMethodSymbol methodSymbol) {
+
+  /// <summary>
+  /// Validates if the provided factory method is suitable for creating the desired type
+  /// and constructs the method if necessary for generic types.
+  /// </summary>
+  /// <param name="methodSymbol">The factory method symbol to validate.</param>
+  /// <param name="desiredType">The type the factory method is expected to produce.</param>
+  /// <returns>The validated method symbol, possibly constructed for generic types.</returns>
+  /// <exception cref="InvalidOperationException">
+  /// Thrown if the factory method does not return a named non-void type,
+  /// or if the returned type does not match the desired type.
+  /// </exception>
+  public static IMethodSymbol ValidateFactoryMethod(this IMethodSymbol methodSymbol, ITypeSymbol desiredType) {
     if (methodSymbol.ReturnsVoid || methodSymbol.ReturnType is not INamedTypeSymbol) {
       throw new InvalidOperationException(
           $"Factory method '{methodSymbol.ToDisplayString()}' must return a named non-void type.");
+    }
+
+    if (methodSymbol is {
+            IsGenericMethod: true,
+            ReturnType: INamedTypeSymbol { IsGenericType: true } genericReturn
+        } && desiredType is INamedTypeSymbol { IsGenericType: true} desiredGeneric 
+          && TypeSymbolEqualityComparer.Instance.Equals(genericReturn, desiredGeneric.ConstructedFrom)) {
+      return methodSymbol.Construct(desiredGeneric.TypeArguments.ToArray());
     }
 
     return methodSymbol;

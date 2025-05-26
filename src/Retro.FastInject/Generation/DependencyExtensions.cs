@@ -215,7 +215,7 @@ public static class DependencyExtensions {
     }
 
     // Extract the service scope from the attribute
-    ServiceScope scope = ServiceScope.Singleton; // Default is Singleton
+    var scope = ServiceScope.Singleton; // Default is Singleton
     if (factoryAttribute.ConstructorArguments.Length > 0 &&
         factoryAttribute.ConstructorArguments[0].Value is int scopeValue) {
       scope = (ServiceScope)scopeValue;
@@ -226,7 +226,15 @@ public static class DependencyExtensions {
         .FirstOrDefault(kvp => kvp.Key == "Key")
         .Value.Value?.ToString();
 
-    return [new ServiceDeclaration(methodSymbol.ReturnType, scope, key, methodSymbol)];
+    var returnType = methodSymbol.ReturnType;
+    if (methodSymbol is {
+            IsGenericMethod: true,
+            ReturnType: INamedTypeSymbol { IsGenericType: true } generic
+        } && generic.TypeArguments.All(x => x is ITypeParameterSymbol)) {
+      returnType = generic.ConstructedFrom;
+    }
+
+    return [new ServiceDeclaration(returnType, scope, key, methodSymbol)];
   }
 
   private static IEnumerable<ServiceDeclaration> GetInstanceServices(ISymbol memberSymbol) {

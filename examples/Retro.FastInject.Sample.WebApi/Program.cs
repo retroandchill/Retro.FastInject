@@ -3,7 +3,7 @@ using Retro.FastInject.Sample.WebApi.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-//builder.Host.UseServiceProviderFactory(new AppServiceProviderFactory());
+builder.Host.UseServiceProviderFactory(new AppServiceProviderFactory());
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
