@@ -1,0 +1,6 @@
+@Retro.FastInject.Sample.WebApi_HostAddress = http://localhost:5199
+
+GET {{Retro.FastInject.Sample.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
