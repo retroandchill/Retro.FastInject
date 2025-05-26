@@ -72,6 +72,14 @@ public static class ValidationExtensions {
       // Check the selected service type if available
       if (serviceRegistration is null) continue;
 
+      if (serviceRegistration.CollectedServices is not null) {
+        foreach (var collectedService in serviceRegistration.CollectedServices) {
+          if (serviceManifest.DetectCycle(collectedService.ResolvedType, visited, path, onPath, out cycle)) {
+            return true;
+          }
+        }
+      }
+
       var serviceType = serviceRegistration.ResolvedType;
       if (serviceManifest.DetectCycle(serviceType, visited, path, onPath, out cycle)) {
         return true;

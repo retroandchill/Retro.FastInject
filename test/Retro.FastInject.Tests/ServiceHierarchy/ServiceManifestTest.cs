@@ -1228,4 +1228,51 @@ public class ServiceManifestTest {
     Assert.That(collectedServices, Is.Not.Null);
     Assert.That(collectedServices, Has.Count.EqualTo(2), "Collection should contain exactly 2 plugins");
   }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithIEnumerableCircularDependency_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency involving an IEnumerable:
+    // ServiceA depends on IEnumerable<IService> which includes ServiceB
+    // ServiceB depends on ServiceA, creating a cycle
+    const string code = """
+                        using System.Collections.Generic;
+                        
+                        namespace Test {
+                          public interface IService { }
+                          
+                          public class ServiceA {
+                            public ServiceA(IEnumerable<IService> services) { }
+                          }
+                          
+                          public class ServiceB : IService {
+                            public ServiceB(ServiceA serviceA) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService");
+  
+    // Register services in the manifest
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+    
+    // Register interface implementations
+    _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, serviceBType);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+  
+    // Act & Assert
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
+  
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
+    Assert.That(exception.Message, Does.Contain("ServiceA"));
+    Assert.That(exception.Message, Does.Contain("ServiceB"));
+    Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
+  }
 }
