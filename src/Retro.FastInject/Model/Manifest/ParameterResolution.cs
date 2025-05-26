@@ -57,6 +57,8 @@ public record ParameterResolution {
   /// Indicates whether the parameter has multiple service registrations available for resolution.
   /// </summary>
   public bool HasMultipleRegistrations { get; set; }
+  
+  public bool CreatesLazyTransientCycle { get; set; }
 
   /// <summary>
   /// A collection of service registrations associated with a parameter
