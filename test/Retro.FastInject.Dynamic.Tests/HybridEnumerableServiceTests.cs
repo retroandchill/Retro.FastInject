@@ -139,11 +139,11 @@ public class HybridEnumerableServiceTests {
     
     Assert.Multiple(() => {
       Assert.That(consumer!.HasCompileTimePlugin, Is.True, "Should have compile-time plugin");
-      Assert.That(consumer.DynamicPluginsCount, Is.EqualTo(2), "Should inject 2 dynamic plugins");
+      Assert.That(consumer.DynamicPluginsCount, Is.EqualTo(3), "Should inject 2 dynamic plugins and one compile-time plugin");
     });
     
     var pluginNames = consumer!.GetAllPluginNames().ToList();
-    Assert.That(pluginNames, Has.Count.EqualTo(3));
+    Assert.That(pluginNames, Has.Count.EqualTo(4));
     
     Assert.Multiple(() => {
       Assert.That(pluginNames, Contains.Item("Compile-time Plugin"));
