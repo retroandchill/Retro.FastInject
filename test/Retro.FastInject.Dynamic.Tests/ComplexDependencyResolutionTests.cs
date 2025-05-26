@@ -20,65 +20,39 @@ public class CompileTimeRootService : ICompileTimeService {
   public string GetValue() => "Compile-time Root";
 }
 
-public class ServiceWithCompileTimeDependency {
-  private readonly ICompileTimeService _service;
+public class ServiceWithCompileTimeDependency(ICompileTimeService service) {
 
-  public ServiceWithCompileTimeDependency(ICompileTimeService service) {
-    _service = service;
-  }
-
-  public string GetDependencyValue() => _service.GetValue();
+  public string GetDependencyValue() => service.GetValue();
 }
 
 public interface IDynamicService {
   string GetValue();
 }
 
-public class ComplexDynamicService : IDynamicService {
-  private readonly ICompileTimeService _compileTimeService;
+public class ComplexDynamicService(ICompileTimeService compileTimeService) : IDynamicService {
 
-  public ComplexDynamicService(ICompileTimeService compileTimeService) {
-    _compileTimeService = compileTimeService;
-  }
-
-  public string GetValue() => $"Dynamic service depending on {_compileTimeService.GetValue()}";
+  public string GetValue() => $"Dynamic service depending on {compileTimeService.GetValue()}";
 }
 
 public class AnotherDynamicService : IDynamicService {
   public string GetValue() => "Another dynamic service";
 }
 
-public class ServiceWithMixedDependencies {
-  private readonly ICompileTimeService _compileTimeService;
-  private readonly IDynamicService _dynamicService;
-
-  public ServiceWithMixedDependencies(
+public class ServiceWithMixedDependencies(
     ICompileTimeService compileTimeService,
-    [AllowDynamic] IDynamicService dynamicService) 
-  {
-    _compileTimeService = compileTimeService;
-    _dynamicService = dynamicService;
-  }
+    [AllowDynamic] IDynamicService dynamicService) {
 
-  public string GetCompileTimeValue() => _compileTimeService.GetValue();
-  public string GetDynamicValue() => _dynamicService.GetValue();
+  public string GetCompileTimeValue() => compileTimeService.GetValue();
+  public string GetDynamicValue() => dynamicService.GetValue();
 }
 
-public class ScopedServiceWithDynamicDependency {
-  private readonly ICompileTimeService _compileTimeService;
-  private readonly IDynamicService _dynamicService;
+public class ScopedServiceWithDynamicDependency(
+    ICompileTimeService compileTimeService,
+    [AllowDynamic] IDynamicService dynamicService) {
   public Guid Id { get; } = Guid.NewGuid();
 
-  public ScopedServiceWithDynamicDependency(
-    ICompileTimeService compileTimeService,
-    [AllowDynamic] IDynamicService dynamicService)
-  {
-    _compileTimeService = compileTimeService;
-    _dynamicService = dynamicService;
-  }
-
   public string GetCombinedValue() => 
-    $"{_compileTimeService.GetValue()} + {_dynamicService.GetValue()}";
+    $"{compileTimeService.GetValue()} + {dynamicService.GetValue()}";
 }
 
 /// <summary>

@@ -9,7 +9,6 @@ using Retro.FastInject.Comparers;
 using Retro.FastInject.Generation;
 using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Template;
-using Retro.FastInject.Utils;
 
 namespace Retro.FastInject;
 

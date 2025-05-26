@@ -9,6 +9,7 @@ namespace Retro.FastInject.Dynamic.Tests;
 [ServiceProvider(AllowDynamicRegistrations = true)]
 [Singleton<CompileTimePlugin>]
 [Singleton<PluginConsumer>]
+[Singleton<DynamicPluginConsumer>]
 [Singleton<MixedPluginConsumer>]
 public partial class TestHybridEnumerableServiceProvider;
 
@@ -39,6 +40,19 @@ public class PluginConsumer {
   
   public bool Contains(string pluginName) => 
     Plugins.Any(p => p.GetName() == pluginName);
+}
+
+public class DynamicPluginConsumer {
+  public IEnumerable<IPlugin> Plugins { get; }
+
+  public DynamicPluginConsumer([AllowDynamic] IEnumerable<IPlugin> plugins) {
+    Plugins = plugins;
+  }
+  
+  public int Count => Plugins.Count();
+  
+  public bool Contains(string pluginName) => 
+      Plugins.Any(p => p.GetName() == pluginName);
 }
 
 public class MixedPluginConsumer {
@@ -96,7 +110,7 @@ public class HybridEnumerableServiceTests {
     var provider = new TestHybridEnumerableServiceProvider(services);
 
     // Act
-    var consumer = provider.GetService<PluginConsumer>();
+    var consumer = provider.GetService<DynamicPluginConsumer>();
 
     // Assert
     Assert.That(consumer, Is.Not.Null);

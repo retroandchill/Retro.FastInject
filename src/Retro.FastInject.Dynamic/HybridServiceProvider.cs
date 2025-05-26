@@ -205,7 +205,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
             break;
           }
           
-          parameterInstances[i] = parameter.DefaultValue;
+          parameterInstances[i] = parameterInstance ?? parameter.DefaultValue;
         }
 
         if (canResolveAll) {

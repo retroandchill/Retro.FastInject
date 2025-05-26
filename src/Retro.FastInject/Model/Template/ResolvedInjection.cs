@@ -1,4 +1,6 @@
-﻿using Retro.FastInject.Model.Manifest;
+﻿using Microsoft.CodeAnalysis;
+using Retro.FastInject.Generation;
+using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Utils;
 namespace Retro.FastInject.Model.Template;
 
@@ -27,17 +29,23 @@ public record ResolvedInjection {
   /// of services of the same type, when applicable. It is null if no index is assigned.
   /// </summary>
   public required int? Index { get; init; }
+  
+  public bool IsCollection { get; init; }
+  
+  public bool UseDynamic { get; init; }
 
   /// <summary>
   /// Creates a <see cref="ResolvedInjection"/> instance from a given <see cref="ServiceRegistration"/>.
   /// </summary>
   /// <param name="registration">The service registration containing information about the service type, name, and index.</param>
   /// <returns>An instance of <see cref="ResolvedInjection"/> populated with information from the provided service registration.</returns>
-  public static ResolvedInjection FromRegistration(ServiceRegistration registration) {
+  public static ResolvedInjection FromRegistration(ServiceRegistration registration, bool useDynamic) {
     return new ResolvedInjection {
         ServiceName = registration.Type.GetSanitizedTypeName(),
         ServiceType = registration.Type.ToDisplayString(),
-        Index = registration.IndexForType > 0 ? registration.IndexForType : null
+        Index = registration.IndexForType > 0 ? registration.IndexForType : null,
+        IsCollection = registration.Type is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericCollectionType(),
+        UseDynamic = useDynamic
     };
   }
 }

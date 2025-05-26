@@ -103,7 +103,8 @@ public static class ResolutionExtensions {
     var parameterResolution = new ParameterResolution {
         Parameter = parameter,
         ParameterType = paramType,
-        IsNullable = isNullable
+        IsNullable = isNullable,
+        UseDynamic = parameter.GetAttribute<AllowDynamicAttribute>() is not null
     };
 
     // Check for FromKeyedServices attribute
@@ -124,8 +125,7 @@ public static class ResolutionExtensions {
     parameterResolution.DefaultValue = parameter.GetDefaultValueString();
     constructorResolution.Parameters.Add(parameterResolution);
 
-    if (!canResolve && parameter.GetAttribute<AllowDynamicAttribute>() is not null) {
-      parameterResolution.UseDynamic = true;
+    if (!canResolve && parameterResolution.UseDynamic) {
       return;
     }
 
@@ -193,11 +193,7 @@ public static class ResolutionExtensions {
                                            ParameterResolution targetParameter,
                                            string? keyName,
                                            ref ServiceRegistration? selectedService) {
-    var genericTypeName = namedType.ConstructedFrom.ToDisplayString();
-    if (genericTypeName is "System.Collections.Generic.IEnumerable<T>" or
-        "System.Collections.Generic.IReadOnlyCollection<T>" or
-        "System.Collections.Generic.IReadOnlyList<T>" or
-        "System.Collections.Immutable.ImmutableArray<T>") {
+    if (IsGenericCollectionType(namedType)) {
       return serviceManifest.TryResolveServiceCollection(namedType, compilation, targetParameter.Parameter, 
                                                          out selectedService);
     }
@@ -236,8 +232,15 @@ public static class ResolutionExtensions {
       
     return true;
   }
+  public static bool IsGenericCollectionType(this INamedTypeSymbol genericType) {
+    return genericType.ConstructedFrom.ToDisplayString() is "System.Collections.Generic.IEnumerable<T>" or
+        "System.Collections.Generic.IReadOnlyCollection<T>" or
+        "System.Collections.Generic.IReadOnlyList<T>" or
+        "System.Collections.Immutable.ImmutableArray<T>";
+  }
+  
   private static bool TryResolveServiceCollection(this ServiceManifest serviceManifest, INamedTypeSymbol namedType, Compilation compilation, IParameterSymbol targetParameter, 
-                                           [NotNullWhen(true)] out ServiceRegistration? selectedService) {
+                                                  [NotNullWhen(true)] out ServiceRegistration? selectedService) {
     var elementType = namedType.TypeArguments[0];
     if (!serviceManifest.TryGetServices(elementType, out var elementServices)) {
       elementServices = [];
