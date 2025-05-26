@@ -1,4 +1,5 @@
-﻿{{~#SelectedService~}}
+﻿{{~#IsLazy}}new Lazy<{{ParameterType}}>(() => {{/IsLazy~}}
+{{#SelectedService~}}
 {{~#Index~}}this.Get{{ServiceName}}_{{Index}}(){{~/Index~}}
 {{~^Index~}}((IServiceProvider<{{ServiceType}}>) this).GetService(){{~/Index~}}
 {{~#IsCollection~}}{{~#UseDynamic~}}.Concat(({{ServiceType}}) {{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ServiceType}}>([])).ToImmutableArray(){{~/UseDynamic~}}{{~/IsCollection~}}    
@@ -17,3 +18,4 @@
 {{~^UseDynamic~}}null{{~/UseDynamic~}}
 {{~/HasDefaultValue~}}
 {{~/SelectedService~}}
+{{~#IsLazy~}}){{~/IsLazy~}}

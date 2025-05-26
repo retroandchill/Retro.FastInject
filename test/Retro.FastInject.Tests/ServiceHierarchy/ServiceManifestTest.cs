@@ -469,6 +469,43 @@ public class ServiceManifestTest {
     // Act & Assert - should not throw an exception
     Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithValueTypeAndNullableValueTypeCycle_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency involving a value type and its nullable version
+    const string code = """
+                        namespace Test {
+                          public struct ValueService {
+                            public ValueService(NullableValueConsumer consumer) { }
+                          }
+                          
+                          public class NullableValueConsumer {
+                            public NullableValueConsumer(ValueService? valueService) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var valueServiceType = compilation.GetTypeSymbol("Test.ValueService");
+    var nullableConsumerType = compilation.GetTypeSymbol("Test.NullableValueConsumer");
+  
+    // Register services in the manifest
+    var regValueService = _manifest.AddService(valueServiceType, ServiceScope.Singleton);
+    var regNullableConsumer = _manifest.AddService(nullableConsumerType, ServiceScope.Singleton);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regValueService, compilation);
+    _manifest.CheckConstructorDependencies(regNullableConsumer, compilation);
+  
+    // Act & Assert
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
+  
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
+    Assert.That(exception.Message, Does.Contain("ValueService"));
+    Assert.That(exception.Message, Does.Contain("NullableValueConsumer"));
+    Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
+  }
 
   [Test]
   public void CheckConstructorDependencies_WithNullableDependency_Succeeds() {
@@ -1190,5 +1227,199 @@ public class ServiceManifestTest {
     var collectedServices = collectionResolution.Parameters[0].SelectedService?.CollectedServices;
     Assert.That(collectedServices, Is.Not.Null);
     Assert.That(collectedServices, Has.Count.EqualTo(2), "Collection should contain exactly 2 plugins");
+  }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithIEnumerableCircularDependency_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency involving an IEnumerable:
+    // ServiceA depends on IEnumerable<IService> which includes ServiceB
+    // ServiceB depends on ServiceA, creating a cycle
+    const string code = """
+                        using System.Collections.Generic;
+                        
+                        namespace Test {
+                          public interface IService { }
+                          
+                          public class ServiceA {
+                            public ServiceA(IEnumerable<IService> services) { }
+                          }
+                          
+                          public class ServiceB : IService {
+                            public ServiceB(ServiceA serviceA) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService");
+  
+    // Register services in the manifest
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+    
+    // Register interface implementations
+    _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, serviceBType);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+  
+    // Act & Assert
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
+  
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
+    Assert.That(exception.Message, Does.Contain("ServiceA"));
+    Assert.That(exception.Message, Does.Contain("ServiceB"));
+    Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
+  }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithLazySingletonCircularDependency_Succeeds() {
+    // Create a class structure with circular dependency, but one uses Lazy<T>
+    const string code = """
+                        using System;
+                        
+                        namespace Test {
+                          public class ServiceA {
+                            public ServiceA(Lazy<ServiceB> serviceB) { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceA serviceA) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+  
+    // Register services in the manifest as singletons
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+  
+    // Act & Assert - should not throw because Lazy<T> breaks the cycle
+    Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
+  }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithLazyScopedCircularDependency_Succeeds() {
+    // Create a class structure with circular dependency where one is scoped, one is singleton
+    const string code = """
+                        using System;
+                        
+                        namespace Test {
+                          public class ServiceA {
+                            public ServiceA(Lazy<ServiceB> serviceB) { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceA serviceA) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+  
+    // Register one as singleton, one as scoped
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Scoped);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+  
+    // Act & Assert - should not throw because Lazy<T> breaks the cycle
+    Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
+  }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithLazyTransientCircularDependency_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency where both are transient
+    const string code = """
+                        using System;
+                        
+                        namespace Test {
+                          public class ServiceA {
+                            public ServiceA(Lazy<ServiceB> serviceB) { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(ServiceA serviceA) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+  
+    // Register both as transient
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Transient);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Transient);
+  
+    // Check dependencies to build the constructor resolutions
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(regB, compilation));
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.CheckConstructorDependencies(regA, compilation));
+  
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Lazy transient cycle detected"));
+    Assert.That(exception.Message, Does.Contain("ServiceA"));
+    Assert.That(exception.Message, Does.Contain("ServiceB"));
+  }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithLazyMixedCircularDependency_Succeeds() {
+    // Create a more complex structure with multiple services and mixed lifetime scopes
+    const string code = """
+                        using System;
+                        
+                        namespace Test {
+                          public interface IService { }
+                          
+                          public class ServiceA : IService {
+                            public ServiceA(Lazy<ServiceB> serviceB) { }
+                          }
+                          
+                          public class ServiceB {
+                            public ServiceB(IService service) { }
+                          }
+                          
+                          public class ServiceC {
+                            public ServiceC() { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
+    var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
+    var serviceCType = compilation.GetTypeSymbol("Test.ServiceC");
+    var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService");
+  
+    // Register the services with different lifetimes
+    var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
+    var regB = _manifest.AddService(serviceBType, ServiceScope.Scoped);
+    var regC = _manifest.AddService(serviceCType, ServiceScope.Transient);
+    
+    // Register interface implementations
+    _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, serviceAType);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regA, compilation);
+    _manifest.CheckConstructorDependencies(regB, compilation);
+    _manifest.CheckConstructorDependencies(regC, compilation);
+  
+    // Act & Assert - should not throw because Lazy<T> breaks the cycle
+    Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
 }

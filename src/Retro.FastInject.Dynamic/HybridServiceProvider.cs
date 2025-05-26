@@ -89,6 +89,21 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
   }
 
+  private static bool IsLazyType(Type type, [NotNullWhen(true)] out Type? elementType) {
+    elementType = null;
+    
+    if (!type.IsGenericType) {
+      return false;
+    }
+    
+    var genericTypeDefinition = type.GetGenericTypeDefinition();
+    
+    if (genericTypeDefinition != typeof(Lazy<>)) return false;
+    
+    elementType = type.GetGenericArguments()[0];
+    return true;
+  }
+
   /// <summary>
   /// Gets the service object of the specified type.
   /// </summary>
@@ -103,11 +118,45 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       return asReadOnly;
     }
 
+    if (CheckLazyInjection(serviceType, _compileTimeServiceProvider, out var lazyService)) return lazyService;
+
     if (!_descriptors.TryGetValue(serviceType, out var descriptors) || descriptors.Count <= 0) return null;
 
     // Always use the last registered service when multiple registrations exist
     var descriptor = descriptors[^1];
     return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
+  }
+  private static bool CheckLazyInjection(Type serviceType, 
+                                         IServiceProvider context, 
+                                         out object? lazyService) {
+    if (!IsLazyType(serviceType, out var lazyContents)) {
+      lazyService = null;
+      return false;
+    }
+
+    var lazyType = typeof(Lazy<>).MakeGenericType(lazyContents);
+    var funcType = typeof(Func<>).MakeGenericType(lazyContents);
+    var lazyConstructor = lazyType.GetConstructor([funcType])!;
+    
+    var funcMethod = typeof(ServiceProviderServiceExtensions).GetMethods()
+        .Where(x => x.Name == nameof(ServiceProviderServiceExtensions.GetRequiredService))
+        .Select(m => new {
+            Method = m,
+            Params = m.GetParameters(),
+            Args = m.GetGenericArguments()
+        })
+        .Where(x => x.Params.Length == 1
+                    && x.Args.Length == 1)
+        .Select(x => x.Method.MakeGenericMethod(lazyContents))
+        .First();
+    
+    // Create a delegate that will resolve the service when needed
+    var valueFactory = Delegate.CreateDelegate(funcType, context, 
+        funcMethod);
+
+    // Create the Lazy instance using the constructor and delegate
+    lazyService = lazyConstructor.Invoke([valueFactory]);
+    return true;
   }
   private static bool CheckCollectionInjection(HybridServiceProvider<T> serviceProvider, 
                                                Scope currentScope, Type serviceType, out object? asReadOnly) {
@@ -330,6 +379,8 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       if (CheckCollectionInjection(_hybridServiceProvider, this, serviceType, out var asReadOnly)) {
         return asReadOnly;
       }
+      
+      if (CheckLazyInjection(serviceType, CompileTimeScope, out var lazyService)) return lazyService;
 
       if (!_hybridServiceProvider._descriptors.TryGetValue(serviceType, out var descriptors) || descriptors.Count <= 0) return null;
 

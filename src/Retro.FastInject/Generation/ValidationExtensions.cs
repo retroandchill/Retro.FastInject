@@ -68,14 +68,18 @@ public static class ValidationExtensions {
                                  [NotNullWhen(true)] ref List<ITypeSymbol>? cycle, 
                                  ConstructorResolution resolution) {
     foreach (var serviceRegistration in resolution.Parameters
-                 .Select(param => new {
-                     param,
-                     isNullable = param.Parameter.Type.NullableAnnotation == NullableAnnotation.Annotated
-                 })
-                 .Where(t => !t.isNullable && t.param.DefaultValue == null)
-                 .Select(t => t.param.SelectedService)) {
+                 .Where(p => !p.IsLazy)
+                 .Select(p => p.SelectedService)) {
       // Check the selected service type if available
       if (serviceRegistration is null) continue;
+
+      if (serviceRegistration.CollectedServices is not null) {
+        foreach (var collectedService in serviceRegistration.CollectedServices) {
+          if (serviceManifest.DetectCycle(collectedService.ResolvedType, visited, path, onPath, out cycle)) {
+            return true;
+          }
+        }
+      }
 
       var serviceType = serviceRegistration.ResolvedType;
       if (serviceManifest.DetectCycle(serviceType, visited, path, onPath, out cycle)) {

@@ -28,6 +28,11 @@ public record ParameterResolution {
   public bool UseDynamic { get; set; } = false;
 
   /// <summary>
+  /// Indicates whether the parameter is resolved as a lazy-loaded service.
+  /// </summary>
+  public bool IsLazy { get; set; } = false;
+
+  /// <summary>
   /// Key used for resolution, null for non-keyed services
   /// </summary>
   public string? Key { get; set; }
@@ -52,6 +57,12 @@ public record ParameterResolution {
   /// Indicates whether the parameter has multiple service registrations available for resolution.
   /// </summary>
   public bool HasMultipleRegistrations { get; set; }
+
+  /// <summary>
+  /// Indicates whether the resolution creates a lazy transient cycle, which occurs when a lazily
+  /// resolved service depends on another transient service, creating an unresolved dependency loop.
+  /// </summary>
+  public bool CreatesLazyTransientCycle { get; set; }
 
   /// <summary>
   /// A collection of service registrations associated with a parameter
