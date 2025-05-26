@@ -1,0 +1,19 @@
+﻿{{~#SelectedService~}}
+{{~#Index~}}this.Get{{ServiceName}}_{{Index}}(){{~/Index~}}
+{{~^Index~}}((IServiceProvider<{{ServiceType}}>) this).GetService(){{~/Index~}}
+{{~#IsCollection~}}{{~#UseDynamic~}}.Concat(({{ServiceType}}) {{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ServiceType}}>([])).ToImmutableArray(){{~/UseDynamic~}}{{~/IsCollection~}}    
+{{~/SelectedService~}}
+{{~^SelectedService~}}
+{{~#HasDefaultValue~}}
+{{~#UseDynamic~}}
+{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.{{#WithKey}}GetKeyedService<{{ParameterType}}>("{{Key}}"){{/WithKey}}{{^WithKey}}GetService<{{ParameterType}}>(){{/WithKey}} ?? {{DefaultValue}}{{~/UseDynamic~}}
+{{~^UseDynamic~}}{{DefaultValue}}{{~/UseDynamic~}}
+{{~/HasDefaultValue~}}
+{{~^HasDefaultValue~}}
+{{~#UseDynamic~}}
+{{~#IsNullable~}}{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ParameterType}}>(){{~/IsNullable~}}
+{{~^IsNullable~}}{{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetRequiredService<{{ParameterType}}>(){{~/IsNullable~}}
+{{~/UseDynamic~}}
+{{~^UseDynamic~}}null{{~/UseDynamic~}}
+{{~/HasDefaultValue~}}
+{{~/SelectedService~}}

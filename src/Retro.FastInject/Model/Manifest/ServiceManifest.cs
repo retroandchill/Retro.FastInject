@@ -22,6 +22,19 @@ public class ServiceManifest {
       new(TypeSymbolEqualityComparer.Instance);
 
   /// <summary>
+  /// Indicates whether the system should allow dynamic resolution of services.
+  /// </summary>
+  /// <remarks>
+  /// When set to <c>true</c>, dynamic resolution enables the system to resolve services
+  /// at runtime, including cases where specific attributes (e.g., <c>AllowDynamicAttribute</c>)
+  /// are used on parameters. This provides flexibility for resolving dependencies that
+  /// are not registered explicitly but might be handled dynamically.
+  /// By default, dynamic resolution is disabled, requiring all dependencies to be
+  /// explicitly registered and resolved at compilation time.
+  /// </remarks>
+  public bool AllowDynamicResolution { get; init; }
+
+  /// <summary>
   /// Gets all constructor resolutions that have been recorded.
   /// </summary>
   public IEnumerable<ConstructorResolution> GetAllConstructorResolutions() {

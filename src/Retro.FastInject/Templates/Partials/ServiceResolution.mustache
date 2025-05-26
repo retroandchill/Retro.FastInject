@@ -5,18 +5,18 @@ return (({{providerInterface}}<{{OtherType}}>) {{providerInstance}}).{{getServic
 {{#if isScope}}
 return (({{providerInterface}}<{{ServiceType}}>) _root).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}}); 
 {{else}}
-return {{InitializingStatement}};
+return {{> GetInitializingStatement}};
 {{/if}} 
 {{/IsSingleton}}
 {{#IsScoped}}
 {{#if isScope}}    
-return {{InitializingStatement}};
+return {{> GetInitializingStatement}};
 {{else}}
 return (({{providerInterface}}<{{ServiceType}}>) GetRootScope()).{{getServiceMethod}}({{#if serviceKey}}serviceKey{{/if}});
 {{/if}}
 {{/IsScoped}}
 {{#IsTransient}}
-var service = {{#if isScope}}{{ScopedTransientInitializer}}{{else}}{{InitializingStatement}}{{/if}};  
+var service = {{> GetInitializingStatement isScope=isScope}};  
 {{> DisposableManagement}}
 return service;  
 {{/IsTransient}}

@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Utils;
@@ -87,9 +86,7 @@ public record ServiceRegistration {
   public string FieldName {
     get {
       var suffix = "";
-      if (Key is not null) {
-        suffix = $"_{Key}";
-      } else if (IndexForType > 0) {
+      if (IndexForType > 0) {
         suffix = $"_{IndexForType}";
       }
 
@@ -110,38 +107,4 @@ public record ServiceRegistration {
   /// pattern when they go out of scope in the dependency injection framework.
   public bool IsAsyncDisposable { get; init; }
 
-  /// <summary>
-  /// Generates the initialization statement for the service registration, incorporating
-  /// dependency resolution, lifetime considerations, and associated symbol handling.
-  /// </summary>
-  /// <param name="parameters">The parameters required for the service instantiation or method invocation formatted as a string.</param>
-  /// <param name="scopedTransient">A boolean flag indicating whether to handle scoped transient initialization logic.</param>
-  /// <returns>
-  /// A string representing the initialization statement for the service, considering the
-  /// service's lifetime, type, and associated symbol.
-  /// </returns>
-  public string GetInitializingStatement(string parameters, bool scopedTransient = false) {
-    var basicBody = AssociatedSymbol switch {
-        IMethodSymbol method => $"{GetMethodInvocation(method, scopedTransient)}({parameters})",
-        IPropertySymbol or IFieldSymbol => $"{AssociatedSymbol.Name}",
-        _ => $"new {Type.ToDisplayString()}({parameters})"
-    };
-
-    if (Lifetime == ServiceScope.Transient || AssociatedSymbol is IPropertySymbol or IFieldSymbol) return basicBody;
-
-    if (Type.IsValueType) {
-      return $"InitializationUtils.EnsureValueInitialized(ref {FieldName}, this, () => {basicBody})";
-    }
-
-    var functionName = $"{typeof(LazyInitializer).FullName}.{nameof(LazyInitializer.EnsureInitialized)}";
-    return $"{functionName}(ref {FieldName}, () => {basicBody})";
-  }
-
-  private string GetMethodInvocation(IMethodSymbol method, bool scopedTransient) {
-    if (method.IsStatic) {
-      return method.ToDisplayString(new SymbolDisplayFormat(memberOptions: SymbolDisplayMemberOptions.None));
-    }
-
-    return Lifetime == ServiceScope.Scoped || scopedTransient ? $"_root.{method.Name}" : method.Name;
-  }
 }

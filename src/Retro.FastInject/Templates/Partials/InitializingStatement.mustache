@@ -1,0 +1,5 @@
+﻿{{~#HasAssociatedMethod~}}
+{{~#IsMethodStatic~}}{{AssociatedMethodFullName}}{{~/IsMethodStatic~}}{{~^IsMethodStatic~}}{{~#IsScoped~}}{{~#isScope~}}_root.{{~/isScope~}}{{AssociatedSymbolName}}{{~/IsScoped~}}{{~^IsScoped~}}{{~^isScope~}}{{AssociatedSymbolName}}{{~/isScope~}}{{~#isScope~}}_root.{{AssociatedSymbolName}}{{~/isScope~}}{{~/IsScoped~}}{{~/IsMethodStatic~}}({{~> ParametersTemplateHelper~}})
+{{~/HasAssociatedMethod~}}
+{{~#HasAssociatedPropertyOrField~}}{{AssociatedSymbolName}}{{~/HasAssociatedPropertyOrField~}}
+{{~^HasAssociatedMethod~}}{{~^HasAssociatedPropertyOrField~}}new {{ServiceType}}({{~> ParametersTemplateHelper~}}){{~/HasAssociatedPropertyOrField~}}{{~/HasAssociatedMethod~}}

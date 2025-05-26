@@ -17,4 +17,14 @@ namespace Retro.FastInject.Annotations;
 /// as <c>SingletonAttribute</c> can be used to specify service lifetimes.
 /// </example>
 [AttributeUsage(AttributeTargets.Class)]
-public class ServiceProviderAttribute : Attribute;
+public class ServiceProviderAttribute : Attribute {
+  
+  /// <summary>
+  /// Specifies whether dynamic registrations are allowed for the associated property or field.
+  /// A value of `true` enables dynamic registrations, while a value of `false` disables them.
+  /// The default value is `false`. Any occurrence of the value `true` in the service provider declaration
+  /// will enable dynamic registrations.
+  /// </summary>
+  public bool AllowDynamicRegistrations { get; init; } = false;
+  
+}

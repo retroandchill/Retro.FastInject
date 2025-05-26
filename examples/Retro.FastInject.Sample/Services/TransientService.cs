@@ -7,10 +7,10 @@ namespace Retro.FastInject.Sample.Services;
 
 public sealed class TransientService(ValueService? valueService, [FromKeyedServices("other")] IKeyedSingleton keyedSingletons) : ITransientService, IDisposable, IAsyncDisposable {
   public void Dispose() {
-    throw new NotImplementedException();
+    // Do nothing
   }
 
   public ValueTask DisposeAsync() {
-    throw new NotImplementedException();
+    return default;
   }
 }

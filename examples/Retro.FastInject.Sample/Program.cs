@@ -3,8 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Sample;
 using Retro.FastInject.Sample.Services;
 
-var serviceProvider = new SampleServiceProvider(4, 5.0f);
+var serviceCollection = new ServiceCollection();
+serviceCollection.AddSingleton<IDynamicService, DynamicService>();
+using var serviceProvider = new SampleServiceProvider(4, 5.0f, serviceCollection);
 var singleton = serviceProvider.GetService<ISingletonService>();
 using var scope = serviceProvider.CreateScope();
-var scopedService = serviceProvider.GetService<IScopedService>();
+var scopedService = scope.ServiceProvider.GetService<IScopedService>();
 Console.WriteLine("Hello World!");

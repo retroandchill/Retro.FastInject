@@ -5,7 +5,7 @@ namespace Retro.FastInject.Model.Manifest;
 /// <summary>
 /// Records a service resolution for a constructor parameter.
 /// </summary>
-public class ParameterResolution {
+public record ParameterResolution {
   /// <summary>
   /// The parameter symbol
   /// </summary>
@@ -15,6 +15,17 @@ public class ParameterResolution {
   /// The type being injected
   /// </summary>
   public ITypeSymbol ParameterType { get; set; } = null!;
+
+  /// <summary>
+  /// Indicates whether the parameter type is nullable.
+  /// </summary>
+  public bool IsNullable { get; set; } = false;
+
+  /// <summary>
+  /// Indicates whether the parameter resolution should dynamically retrieve the service
+  /// from a hybrid service provider at runtime, if it cannot be resolved statically.
+  /// </summary>
+  public bool UseDynamic { get; set; } = false;
 
   /// <summary>
   /// Key used for resolution, null for non-keyed services

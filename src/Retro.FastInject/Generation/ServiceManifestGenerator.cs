@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using Microsoft.CodeAnalysis;
+using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Manifest;
 
 namespace Retro.FastInject.Generation;
@@ -12,16 +13,15 @@ public static class ServiceManifestGenerator {
   /// <summary>
   /// Generates a manifest that maps services to their implementations, lifetimes, base types, and indirect relationships.
   /// </summary>
-  /// <param name="classSymbol">An instance of <see cref="ITypeSymbol"/> representing the class type whose services and dependencies will be analyzed.</param>
-  /// <returns>A <see cref="ServiceManifest"/> object containing detailed mappings of services, implementations, and dependencies.</returns>
-  public static ServiceManifest GenerateManifest(this ITypeSymbol classSymbol) {
-    // Get all services using GetInjectedServices
-    var services = classSymbol.GetInjectedServices().ToList();
-
+  /// <param name="services">A collection of service declarations representing the services and their associated metadata.</param>
+  /// <returns>A <see cref="ServiceManifest"/> object containing comprehensive mappings of services, implementations, and related dependencies.</returns>
+  public static ServiceManifest GenerateManifest(this in ServiceDeclarationCollection services) {
     // Get the dependencies dictionary
     var dependencies = services.GetDependencies();
 
-    var manifest = new ServiceManifest();
+    var manifest = new ServiceManifest {
+        AllowDynamicResolution = services.AllowDynamicServices
+    };
 
     // Process all services and their dependencies
     foreach (var serviceKvp in dependencies) {

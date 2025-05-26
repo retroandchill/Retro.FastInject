@@ -76,4 +76,16 @@
     <data name="RegularServiceGettersTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
         <value>..\Templates\Partials\RegularServicesGetters.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
     </data>
+    <data name="InitializingStatementTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\InitializingStatement.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
+    <data name="GetInitializingStatementTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\GetInitializingStatement.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
+    <data name="ParameterResolutionTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\ParameterResolution.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
+    <data name="ParametersHelperTemplate" type="System.Resources.ResXFileRef, System.Windows.Forms">
+        <value>..\Templates\Partials\ParametersTemplateHelper.mustache;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </data>
 </root>

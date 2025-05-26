@@ -1,15 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
+{{#WithDynamicServices}}
+using Retro.FastInject.Dynamic;    
+{{/WithDynamicServices}}
 
 namespace {{Namespace}};
 
 #nullable enable
 
-partial class {{ClassName}} : IServiceProvider, 
+partial class {{ClassName}} : ICompileTimeServiceProvider,
     {{#RegularServices}}
     IServiceProvider<{{ServiceType}}>,
     {{/RegularServices}}
@@ -17,30 +22,51 @@ partial class {{ClassName}} : IServiceProvider,
     {{#KeyedServices}}
     IKeyedServiceProvider<{{ServiceType}}>,
     {{/KeyedServices}}
-    IServiceScopeFactory, 
-    IDisposable, 
-    IAsyncDisposable {
+    ICompileTimeScopeFactory {
 
   private Scope? _rootScope;
   {{#Singletons}}
   private {{Type}}? {{Name}};     
   {{/Singletons}}
+  {{#WithDynamicServices}}
+  private readonly HybridServiceProvider<{{ClassName}}> _hybridServiceProvider;
+  {{/WithDynamicServices}}
   private readonly List<DisposableWrapper> _disposables = [];
+  private bool _disposed;
+
+  {{#WithDynamicServices}}
+  {{#Constructors}}
+  public {{../ClassName}}({{#Params}}{{Type}} {{Name}}, {{/Params}}IServiceCollection serviceCollection){{#IsExplicit}} : this({{#Params}}{{Name}}{{^IsLast}}, {{/IsLast}}{{/Params}}){{/IsExplicit}} {
+    _hybridServiceProvider = new HybridServiceProvider<{{../ClassName}}>(this, serviceCollection);
+  }    
+  {{/Constructors}}  
+  {{/WithDynamicServices}}
+
+  ICompileTimeServiceScope ICompileTimeScopeFactory.GetRootScope() {
+    return GetRootScope();
+  }
   
   private Scope GetRootScope() {
-      return LazyInitializer.EnsureInitialized(ref _rootScope, () => new Scope(this));
+    ObjectDisposedException.ThrowIf(_disposed, this);
+    return LazyInitializer.EnsureInitialized(ref _rootScope, () => new Scope(this{{#WithDynamicServices}}, _hybridServiceProvider{{/WithDynamicServices}}));
   }
 
   public object? GetService(Type serviceType) {
+    ObjectDisposedException.ThrowIf(_disposed, this);
     if (serviceType == typeof(IServiceProvider) || serviceType == typeof(IServiceScopeFactory)) {
       return this;
     }
 
     {{#withIndent '    '}}
-    {{> ServiceTypeResolution providerInstance='this'}}
+    {{> ServiceTypeResolution isScope=false providerInstance='this'}}
     {{/withIndent}}    
 
+    {{#WithDynamicServices}}
+    return _hybridServiceProvider.GetService(serviceType);    
+    {{/WithDynamicServices}}
+    {{^WithDynamicServices}}
     return null;
+    {{/WithDynamicServices}}
   }
   
   {{#withIndent '  '}}
@@ -48,12 +74,26 @@ partial class {{ClassName}} : IServiceProvider,
   {{/withIndent}}
 
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
+    ObjectDisposedException.ThrowIf(_disposed, this);
+    {{#WithDynamicServices}}
+    var resolvedService = ResolveKeyedService(serviceType, serviceKey);
+    if (resolvedService is not null) {
+      return resolvedService;
+    }
+    return _hybridServiceProvider.GetKeyedService(serviceType, serviceKey);    
+    {{/WithDynamicServices}}
+    {{^WithDynamicServices}}
+    return ResolveKeyedService(serviceType, serviceKey);
+    {{/WithDynamicServices}}
+  }
+
+  private object? ResolveKeyedService(Type serviceType, object? serviceKey) {
     if (serviceKey is string asString) {
       {{#KeyedServices}}
       if (serviceType == typeof({{ServiceType}})) return ((IKeyedServiceProvider<{{ServiceType}}>) this).GetKeyedService(asString);
       {{/KeyedServices}}
     }
-    
+
     return null;
   }
 
@@ -76,10 +116,26 @@ partial class {{ClassName}} : IServiceProvider,
   {{/KeyedServices}}  
 
   public IServiceScope CreateScope() {
-    return new Scope(this);
+    ObjectDisposedException.ThrowIf(_disposed, this);
+    return new Scope(this{{#WithDynamicServices}}, _hybridServiceProvider{{/WithDynamicServices}});
   }
 
+  public void TryAddDisposable(object instance) {
+    ObjectDisposedException.ThrowIf(_disposed, this);  
+    switch (instance) {
+      case IDisposable disposable:
+        _disposables.Add(new DisposableWrapper(disposable, instance as IAsyncDisposable));
+        break;
+      case IAsyncDisposable asyncDisposable:
+        _disposables.Add(new DisposableWrapper(null, asyncDisposable));
+        break;
+    }
+  }  
+
   public void Dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    
     _rootScope?.Dispose();
     
     {{#Singletons}}
@@ -94,6 +150,9 @@ partial class {{ClassName}} : IServiceProvider,
   }
 
   public async ValueTask DisposeAsync() {
+    if (_disposed) return;
+    _disposed = true;
+    
     if (_rootScope is not null) await _rootScope.DisposeAsync();
 
     {{#Singletons}}
@@ -112,31 +171,36 @@ partial class {{ClassName}} : IServiceProvider,
     }
   }
 
-  public partial class Scope : IServiceProvider, 
+  public partial class Scope : 
                        {{#RegularServices}}
                        IServiceProvider<{{ServiceType}}>,
                        {{/RegularServices}}
-                       IKeyedServiceProvider,
-                       IServiceScope,
                        {{#KeyedServices}}
                        IKeyedServiceProvider<{{ServiceType}}>,
                        {{/KeyedServices}}
-                       IDisposable, 
-                       IAsyncDisposable {
+                       ICompileTimeServiceScope {
     
-    private readonly SampleServiceProvider _root;
+    private readonly {{ClassName}} _root;
     {{#Scoped}}
     private {{Type}}? {{Name}};     
     {{/Scoped}}
+    {{#WithDynamicServices}}
+    private readonly HybridServiceProvider<{{ClassName}}>.Scope _hybridServiceScope;    
+    {{/WithDynamicServices}}
     private readonly List<DisposableWrapper> _disposables = [];
+    private bool _disposed;
 
     public IServiceProvider ServiceProvider => this;
     
-    public Scope(SampleServiceProvider root) {
+    public Scope({{ClassName}} root{{#WithDynamicServices}}, HybridServiceProvider<{{ClassName}}> hybridServiceProvider{{/WithDynamicServices}}) {
       _root = root;
+      {{#WithDynamicServices}}
+      _hybridServiceScope = hybridServiceProvider.CreateScope(this); 
+      {{/WithDynamicServices}}
     }
 
     public object? GetService(Type serviceType) {
+      ObjectDisposedException.ThrowIf(_disposed, this);  
       if (serviceType == typeof(IServiceProvider)) {
         return this;
       }  
@@ -146,10 +210,15 @@ partial class {{ClassName}} : IServiceProvider,
       }
 
       {{#withIndent '      '}}
-      {{> ServiceTypeResolution providerInstance='this'}}
+      {{> ServiceTypeResolution isScope=true providerInstance='this'}}
       {{/withIndent}}
       
+      {{#WithDynamicServices}}
+      return _hybridServiceScope.GetService(serviceType);    
+      {{/WithDynamicServices}}
+      {{^WithDynamicServices}}
       return null;
+      {{/WithDynamicServices}}
     }
     
     {{#withIndent '    '}}
@@ -157,12 +226,26 @@ partial class {{ClassName}} : IServiceProvider,
     {{/withIndent}}
 
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
+      ObjectDisposedException.ThrowIf(_disposed, this);  
+      {{#WithDynamicServices}}
+      var resolvedService = ResolveKeyedService(serviceType, serviceKey);
+      if (resolvedService is not null) {
+        return resolvedService;
+      }
+      return _hybridServiceScope.GetKeyedService(serviceType, serviceKey);    
+      {{/WithDynamicServices}}
+      {{^WithDynamicServices}}
+      return ResolveKeyedService(serviceType, serviceKey);
+      {{/WithDynamicServices}}
+    }
+
+    private object? ResolveKeyedService(Type serviceType, object? serviceKey) {
       if (serviceKey is string asString) {
         {{#KeyedServices}}
         if (serviceType == typeof({{ServiceType}})) return ((IKeyedServiceProvider<{{ServiceType}}>) this).GetKeyedService(asString);
         {{/KeyedServices}}
       }
-    
+      
       return null;
     }
 
@@ -183,8 +266,23 @@ partial class {{ClassName}} : IServiceProvider,
     }
 
     {{/KeyedServices}}  
+    
+    public void TryAddDisposable(object instance) {
+      ObjectDisposedException.ThrowIf(_disposed, this);  
+      switch (instance) {
+        case IDisposable disposable:
+          _disposables.Add(new DisposableWrapper(disposable, instance as IAsyncDisposable));
+          break;
+        case IAsyncDisposable asyncDisposable:
+          _disposables.Add(new DisposableWrapper(null, asyncDisposable));
+          break;
+      }
+    }  
 
     public void Dispose() {
+      if (_disposed) return;
+      _disposed = true;
+        
       {{#Scoped}}
       {{#IsDisposable}}
       {{Name}}?.Dispose();
@@ -197,6 +295,9 @@ partial class {{ClassName}} : IServiceProvider,
     }
 
     public async ValueTask DisposeAsync() {
+      if (_disposed) return; 
+      _disposed = true;
+        
       {{#Scoped}}
       {{#IsAsyncDisposable}}
       if ({{Name}} != null) await {{Name}}.DisposeAsync();

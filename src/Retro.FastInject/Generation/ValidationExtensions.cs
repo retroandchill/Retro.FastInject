@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Comparers;
+using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Manifest;
 
 namespace Retro.FastInject.Generation;

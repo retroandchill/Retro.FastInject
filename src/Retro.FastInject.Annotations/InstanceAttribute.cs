@@ -2,5 +2,20 @@
 
 namespace Retro.FastInject.Annotations;
 
+/// <summary>
+/// Specifies that a particular property or field represents an instance dependency
+/// to be provided or managed by the dependency injection framework.
+/// </summary>
+/// <remarks>
+/// The <c>InstanceAttribute</c> is primarily used to mark properties or fields
+/// in classes that are to be injected or resolved as single-instance dependencies.
+/// It is applied to ensure the annotated element is uniquely managed within
+/// the dependency injection container.
+/// </remarks>
+/// <example>
+/// Apply the <c>InstanceAttribute</c> on a property or field to designate it
+/// as an instance dependency.
+/// </example>
+/// <seealso cref="Attribute"/>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public class InstanceAttribute : Attribute;

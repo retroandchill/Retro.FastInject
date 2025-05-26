@@ -7,8 +7,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Comparers;
 using Retro.FastInject.Generation;
+using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Template;
-using Retro.FastInject.Utils;
 
 namespace Retro.FastInject;
 
@@ -22,6 +22,7 @@ namespace Retro.FastInject;
 /// </remarks>
 [Generator]
 public class ServiceProviderGenerator : IIncrementalGenerator {
+  private const string DependencyInjection = "DependencyInjection";
   /// <inheritdoc />
   public void Initialize(IncrementalGeneratorInitializationContext context) {
     // Get all class declarations with [ServiceProvider] attribute
@@ -63,7 +64,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                 "FastInject001",
                                 "Dependency Injection Error",
                                 $"Class {classSymbol.Name} must be declared partial",
-                                "DependencyInjection",
+                                DependencyInjection,
                                 DiagnosticSeverity.Error,
                                 true
                             ),
@@ -71,8 +72,9 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
           ));
       return;
     }
-
-    var manifest = classSymbol.GenerateManifest();
+    var services = classSymbol.GetInjectedServices();
+    ValidateConstructors(services, context);
+    var manifest = services.GenerateManifest();
 
     // First, resolve all constructor dependencies for all service implementations
     var explicitServices = manifest.GetAllServices().ToList();
@@ -85,7 +87,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                          "FastInject002",
                                          "Dependency Injection Error",
                                          ex.Message,
-                                         "DependencyInjection",
+                                         DependencyInjection,
                                          DiagnosticSeverity.Error,
                                          true
                                      ),
@@ -103,7 +105,7 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
                                      "FastInject003",
                                      "Circular Dependency Error",
                                      ex.Message,
-                                     "DependencyInjection",
+                                     DependencyInjection,
                                      DiagnosticSeverity.Error,
                                      true
                                  ),
@@ -115,19 +117,16 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
 
     // Prepare constructor resolution information for template
     var constructorResolutions = manifest.GetAllConstructorResolutions()
-        .Select(cr => new {
-            cr.Type,
-            Parameters = cr.Parameters.Select(p => p.GetArgDefaultValue()).Joining(", ")
-        })
         .ToDictionary(x => x.Type, x => x.Parameters, TypeSymbolEqualityComparer.Instance);
 
     var regularServices = manifest.GetAllServices()
         .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
         .Select(x => new {
             ServiceType = x.Key.ToDisplayString(),
-            Options = x.Select(y => new ServiceInjection(y,
-                                   constructorResolutions.TryGetValue(x.Key, out var parameters) 
-                                       ? parameters : ""))
+            IsCollection = x.Key is INamedTypeSymbol { IsGenericType: true } generic && generic.IsGenericCollectionType(),
+            AppendCollections = services.AllowDynamicServices,
+            Options = x.Select(y => ServiceInjection.FromResolution(y, 
+                    constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : []))
                 .ToList()
         })
         .ToList();
@@ -144,6 +143,18 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var templateParams = new {
         Namespace = classSymbol.ContainingNamespace.ToDisplayString(),
         ClassName = classSymbol.Name,
+        WithDynamicServices = services.AllowDynamicServices,
+        Constructors = services.ContainerType.Constructors
+            .Select(x => new {
+              IsExplicit = !x.IsImplicitlyDeclared,  
+              Params = x.Parameters.Select((p, i) => new {
+                  Type = p.Type.ToDisplayString(),
+                  p.Name,
+                  IsLast = i == x.Parameters.Length - 1
+              })
+              .ToList()
+            })
+            .ToList(),
         RegularServices = regularServices,
         KeyedServices = keyedServices,
         Singletons = manifest.GetServicesByLifetime(ServiceScope.Singleton)
@@ -174,6 +185,10 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     handlebars.RegisterTemplate("ServiceTypeResolution", SourceTemplates.ServiceTypeResolutionTemplate);
     handlebars.RegisterTemplate("KeyedServiceSwitch", SourceTemplates.KeyedServiceSwitchTemplate);
     handlebars.RegisterTemplate("RegularServiceGetters", SourceTemplates.RegularServiceGettersTemplate);
+    handlebars.RegisterTemplate("InitializingStatement", SourceTemplates.InitializingStatementTemplate);
+    handlebars.RegisterTemplate("GetInitializingStatement", SourceTemplates.GetInitializingStatementTemplate);
+    handlebars.RegisterTemplate("ParameterResolution", SourceTemplates.ParameterResolutionTemplate);
+    handlebars.RegisterTemplate("ParametersTemplateHelper", SourceTemplates.ParametersHelperTemplate);
 
     handlebars.RegisterHelper("withIndent", (writer, options, _, parameters) => {
       var indent = parameters[0] as string ?? "";
@@ -196,8 +211,34 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
     var template = handlebars.Compile(SourceTemplates.ServiceProviderTemplate);
 
     var templateResult = template(templateParams);
-    context.AddSource("ServiceProvider.g.cs", templateResult);
+    context.AddSource($"{classSymbol.Name}.g.cs", templateResult);
 
     Console.WriteLine(manifest.ToString());
   }
+  
+  private static void ValidateConstructors(in ServiceDeclarationCollection declaration, SourceProductionContext context) {
+    if (!declaration.AllowDynamicServices) {
+      return;
+    }
+    
+    var publicConstructors = declaration.ContainerType.Constructors
+        .Where(c => c.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal && !c.IsImplicitlyDeclared);
+    
+    if (publicConstructors.Any()) {
+      context.ReportDiagnostic(
+          Diagnostic.Create(
+              new DiagnosticDescriptor(
+                  "FastInject004",
+                  "Invalid Constructor Accessibility",
+                  "Service provider constructors must be private or protected. Public constructors are not allowed.",
+                  DependencyInjection,
+                  DiagnosticSeverity.Error,
+                  true
+              ),
+              declaration.ContainerType.Locations.FirstOrDefault()
+          )
+      );
+    }
+  }
+
 }

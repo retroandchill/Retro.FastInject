@@ -102,7 +102,9 @@ public static class ResolutionExtensions {
     // Create parameter resolution
     var parameterResolution = new ParameterResolution {
         Parameter = parameter,
-        ParameterType = paramType
+        ParameterType = paramType,
+        IsNullable = isNullable,
+        UseDynamic = serviceManifest.AllowDynamicResolution && parameter.GetAttribute<AllowDynamicAttribute>() is not null
     };
 
     // Check for FromKeyedServices attribute
@@ -122,6 +124,10 @@ public static class ResolutionExtensions {
     parameterResolution.SelectedService = selectedService;
     parameterResolution.DefaultValue = parameter.GetDefaultValueString();
     constructorResolution.Parameters.Add(parameterResolution);
+
+    if (!canResolve && parameterResolution.UseDynamic) {
+      return;
+    }
 
     if (canResolve || isNullable || parameterResolution.DefaultValue is not null) return;
       
@@ -187,11 +193,7 @@ public static class ResolutionExtensions {
                                            ParameterResolution targetParameter,
                                            string? keyName,
                                            ref ServiceRegistration? selectedService) {
-    var genericTypeName = namedType.ConstructedFrom.ToDisplayString();
-    if (genericTypeName is "System.Collections.Generic.IEnumerable<T>" or
-        "System.Collections.Generic.IReadOnlyCollection<T>" or
-        "System.Collections.Generic.IReadOnlyList<T>" or
-        "System.Collections.Immutable.ImmutableArray<T>") {
+    if (IsGenericCollectionType(namedType)) {
       return serviceManifest.TryResolveServiceCollection(namedType, compilation, targetParameter.Parameter, 
                                                          out selectedService);
     }
@@ -230,8 +232,24 @@ public static class ResolutionExtensions {
       
     return true;
   }
+
+  /// <summary>
+  /// Determines whether the specified generic type is a generic collection type, such as IEnumerable&lt;T>,
+  /// IReadOnlyCollection&lt;T>, IReadOnlyList&lt;T>, or ImmutableArray&lt;T>.
+  /// </summary>
+  /// <param name="genericType">The named type symbol representing the generic type to check.</param>
+  /// <returns>
+  /// True if the specified type is a generic collection type; otherwise, false.
+  /// </returns>
+  public static bool IsGenericCollectionType(this INamedTypeSymbol genericType) {
+    return genericType.ConstructedFrom.ToDisplayString() is "System.Collections.Generic.IEnumerable<T>" or
+        "System.Collections.Generic.IReadOnlyCollection<T>" or
+        "System.Collections.Generic.IReadOnlyList<T>" or
+        "System.Collections.Immutable.ImmutableArray<T>";
+  }
+  
   private static bool TryResolveServiceCollection(this ServiceManifest serviceManifest, INamedTypeSymbol namedType, Compilation compilation, IParameterSymbol targetParameter, 
-                                           [NotNullWhen(true)] out ServiceRegistration? selectedService) {
+                                                  [NotNullWhen(true)] out ServiceRegistration? selectedService) {
     var elementType = namedType.TypeArguments[0];
     if (!serviceManifest.TryGetServices(elementType, out var elementServices)) {
       elementServices = [];
@@ -244,16 +262,19 @@ public static class ResolutionExtensions {
     }
 
     var immutableArrayType = typeof(ImmutableArray<>).GetInstantiatedGeneric(compilation, elementType);
-    serviceManifest.AddService(immutableArrayType, ServiceScope.Transient);
+    selectedService = serviceManifest.AddService(immutableArrayType, ServiceScope.Transient,
+        collectedServices: elementServices
+            .Select(serviceManifest.ResolveConcreteType)
+            .Where(x => x.Type is not INamedTypeSymbol { IsGenericType: true } genericType 
+                        || genericType.TypeArguments.All(y => y is not ITypeParameterSymbol))
+            .ToList());
     var readOnlyListType = typeof(IReadOnlyList<>).GetInstantiatedGeneric(compilation, elementType);
     serviceManifest.AddService(readOnlyListType, ServiceScope.Transient, immutableArrayType);
     var readOnlyCollectionType = typeof(IReadOnlyCollection<>).GetInstantiatedGeneric(compilation, elementType);
     serviceManifest.AddService(readOnlyCollectionType, ServiceScope.Transient, immutableArrayType);
     var enumerableType = typeof(IEnumerable<>).GetInstantiatedGeneric(compilation, elementType);
-    selectedService = serviceManifest.AddService(enumerableType, ServiceScope.Transient, immutableArrayType,
-                                                 collectedServices: elementServices
-                                                     .Select(serviceManifest.ResolveConcreteType)
-                                                     .ToList());
+    serviceManifest.AddService(enumerableType, ServiceScope.Transient, immutableArrayType);
+    
     return true;
   }
 
@@ -276,24 +297,5 @@ public static class ResolutionExtensions {
     }
     
     return declaration;
-  }
-  
-  /// <summary>
-  /// Retrieves the default value of the argument for the provided parameter resolution.
-  /// </summary>
-  /// <param name="parameterResolution">The parameter resolution from which to obtain the default value.</param>
-  /// <returns>
-  /// A string representing the default value of the argument. If a default value is defined, it is returned.
-  /// Otherwise, a service resolution expression or "null" is returned based on the context.
-  /// </returns>
-  public static string GetArgDefaultValue(this ParameterResolution parameterResolution) {
-    if (parameterResolution.SelectedService is null || parameterResolution.DefaultValue is not null) {
-      return parameterResolution.DefaultValue ?? "null";
-    }
-              
-    var serviceType = parameterResolution.SelectedService.Type;
-    return parameterResolution.SelectedService.IndexForType > 0 
-        ? $"this.Get{serviceType.Name}_{parameterResolution.SelectedService.IndexForType}()" 
-        : $"((IServiceProvider<{serviceType.ToDisplayString()}>) this).GetService()";
   }
 }
