@@ -157,7 +157,7 @@ public static class ResolutionExtensions {
                                  ITypeSymbol paramType, 
                                  ParameterResolution parameterResolution, 
                                  Compilation compilation, 
-                                 out ServiceRegistration? selectedService) {
+                                 [NotNullWhen(true)] out ServiceRegistration? selectedService) {
     // Check if the dependency can be resolved
     var canResolve = false;
     selectedService = null;
@@ -192,10 +192,14 @@ public static class ResolutionExtensions {
   private static bool CanResolveGenericType(this ServiceManifest serviceManifest, INamedTypeSymbol namedType, Compilation compilation, 
                                            ParameterResolution targetParameter,
                                            string? keyName,
-                                           ref ServiceRegistration? selectedService) {
-    if (IsGenericCollectionType(namedType)) {
+                                           [NotNullWhen(true)] ref ServiceRegistration? selectedService) {
+    if (namedType.IsGenericCollectionType()) {
       return serviceManifest.TryResolveServiceCollection(namedType, compilation, targetParameter.Parameter, 
                                                          out selectedService);
+    }
+
+    if (namedType.IsLazyType()) {
+      return serviceManifest.TryResolveLazyService(namedType, compilation, targetParameter, keyName, out selectedService);
     }
 
     if (!serviceManifest.TryGetServices(namedType.ConstructedFrom, out var registrations)) {
@@ -248,6 +252,10 @@ public static class ResolutionExtensions {
         "System.Collections.Immutable.ImmutableArray<T>";
   }
   
+  private static bool IsLazyType(this INamedTypeSymbol genericType) {
+    return genericType.ConstructedFrom.ToDisplayString() is "System.Lazy<T>";
+  }
+  
   private static bool TryResolveServiceCollection(this ServiceManifest serviceManifest, INamedTypeSymbol namedType, Compilation compilation, IParameterSymbol targetParameter, 
                                                   [NotNullWhen(true)] out ServiceRegistration? selectedService) {
     var elementType = namedType.TypeArguments[0];
@@ -278,6 +286,23 @@ public static class ResolutionExtensions {
     return true;
   }
 
+  private static bool TryResolveLazyService(this ServiceManifest serviceManifest, 
+                                            INamedTypeSymbol namedType, 
+                                            Compilation compilation, 
+                                            ParameterResolution targetParameter,
+                                            string? keyName,
+                                            [NotNullWhen(true)] out ServiceRegistration? selectedService) {
+    var elementType = namedType.TypeArguments[0];
+    if (!serviceManifest.CanResolve(keyName, elementType, targetParameter, compilation, out var resolvedServiceRegistration)) {
+      selectedService = null;
+      return false;
+    }
+
+    targetParameter.IsLazy = true;
+    selectedService = resolvedServiceRegistration;
+    return true;
+  }
+  
   private static ServiceRegistration ResolveConcreteType(this ServiceManifest serviceManifest, 
                                                          ServiceRegistration declaration) {
     if (declaration.ImplementationType is null || !serviceManifest.TryGetServices(declaration.ImplementationType, 

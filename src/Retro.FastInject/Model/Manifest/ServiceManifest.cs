@@ -74,7 +74,8 @@ public class ServiceManifest {
   /// <param name="key">An optional key to differentiate services of the same type.</param>
   /// <param name="collectedServices">The list of services that this is a collection of</param>
   public ServiceRegistration AddService(ITypeSymbol serviceType, ServiceScope lifetime, ITypeSymbol? implementationType = null,
-                                        ISymbol? associatedSymbol = null, string? key = null, List<ServiceRegistration>? collectedServices = null) {
+                                        ISymbol? associatedSymbol = null, string? key = null, 
+                                        List<ServiceRegistration>? collectedServices = null) {
     if (!_services.TryGetValue(serviceType, out var registrations)) {
       registrations = [];
       _services[serviceType] = registrations;

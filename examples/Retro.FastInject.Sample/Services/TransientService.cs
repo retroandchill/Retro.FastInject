@@ -6,6 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Retro.FastInject.Sample.Services;
 
 public sealed class TransientService(ValueService? valueService, [FromKeyedServices("other")] IKeyedSingleton keyedSingletons) : ITransientService, IDisposable, IAsyncDisposable {
+  
+  public ValueService? ValueService { get; } = valueService;
+  
+  public IKeyedSingleton KeyedSingleton { get; } = keyedSingletons;
+  
   public void Dispose() {
     // Do nothing
   }

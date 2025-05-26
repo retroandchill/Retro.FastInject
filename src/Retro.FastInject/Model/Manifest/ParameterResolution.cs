@@ -28,6 +28,11 @@ public record ParameterResolution {
   public bool UseDynamic { get; set; } = false;
 
   /// <summary>
+  /// Indicates whether the parameter is resolved as a lazy-loaded service.
+  /// </summary>
+  public bool IsLazy { get; set; } = false;
+
+  /// <summary>
   /// Key used for resolution, null for non-keyed services
   /// </summary>
   public string? Key { get; set; }

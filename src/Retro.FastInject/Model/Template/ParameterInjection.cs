@@ -56,6 +56,12 @@ public record ParameterInjection {
   public bool UseDynamic { get; init; }
 
   /// <summary>
+  /// Indicates whether the parameter resolution should be treated as a lazy-loaded dependency,
+  /// meaning its instantiation will be deferred until it is accessed.
+  /// </summary>
+  public bool IsLazy { get; init; }
+
+  /// <summary>
   /// Gets or sets a value indicating whether this parameter type is nullable.
   /// </summary>
   public bool IsNullable { get; init; }
@@ -84,6 +90,7 @@ public record ParameterInjection {
         DefaultValue = parameter.DefaultValue,
         IsCollection = parameter.ParameterType is INamedTypeSymbol namedType && namedType.IsGenericCollectionType(),
         UseDynamic = parameter.UseDynamic,
+        IsLazy = parameter.IsLazy,
         IsNullable = parameter.IsNullable,
         IsLast = isLast
     };

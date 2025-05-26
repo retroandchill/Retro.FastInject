@@ -68,6 +68,7 @@ public static class ValidationExtensions {
                                  [NotNullWhen(true)] ref List<ITypeSymbol>? cycle, 
                                  ConstructorResolution resolution) {
     foreach (var serviceRegistration in resolution.Parameters
+                 .Where(p => !p.IsLazy)
                  .Select(p => p.SelectedService)) {
       // Check the selected service type if available
       if (serviceRegistration is null) continue;
