@@ -469,6 +469,43 @@ public class ServiceManifestTest {
     // Act & Assert - should not throw an exception
     Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
+  
+  [Test]
+  public void ValidateDependencyGraph_WithValueTypeAndNullableValueTypeCycle_ThrowsInvalidOperationException() {
+    // Create a class structure with circular dependency involving a value type and its nullable version
+    const string code = """
+                        namespace Test {
+                          public struct ValueService {
+                            public ValueService(NullableValueConsumer consumer) { }
+                          }
+                          
+                          public class NullableValueConsumer {
+                            public NullableValueConsumer(ValueService? valueService) { }
+                          }
+                        }
+                        """;
+  
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var valueServiceType = compilation.GetTypeSymbol("Test.ValueService");
+    var nullableConsumerType = compilation.GetTypeSymbol("Test.NullableValueConsumer");
+  
+    // Register services in the manifest
+    var regValueService = _manifest.AddService(valueServiceType, ServiceScope.Singleton);
+    var regNullableConsumer = _manifest.AddService(nullableConsumerType, ServiceScope.Singleton);
+  
+    // Check dependencies to build the constructor resolutions
+    _manifest.CheckConstructorDependencies(regValueService, compilation);
+    _manifest.CheckConstructorDependencies(regNullableConsumer, compilation);
+  
+    // Act & Assert
+    var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
+  
+    // Verify the exception message contains the circular dependency information
+    Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
+    Assert.That(exception.Message, Does.Contain("ValueService"));
+    Assert.That(exception.Message, Does.Contain("NullableValueConsumer"));
+    Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
+  }
 
   [Test]
   public void CheckConstructorDependencies_WithNullableDependency_Succeeds() {
