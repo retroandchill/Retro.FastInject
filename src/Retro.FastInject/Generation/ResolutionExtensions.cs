@@ -142,8 +142,7 @@ public static class ResolutionExtensions {
       
     AddMissingDependencyDetails(missingDependencies, paramType, keyName, parameterResolution);
   }
-  private static void AddMissingDependencyDetails(List<string> missingDependencies, ITypeSymbol paramType, string? keyName, 
-                                                  ParameterResolution parameterResolution) {
+  private static void AddMissingDependencyDetails(List<string> missingDependencies, ITypeSymbol paramType, string? keyName, ParameterResolution parameterResolution) {
     // Add the missing dependency to the list with detailed information
     var dependency = new StringBuilder(paramType.ToDisplayString());
     if (keyName != null) {
