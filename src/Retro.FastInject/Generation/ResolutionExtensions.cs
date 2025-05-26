@@ -104,7 +104,7 @@ public static class ResolutionExtensions {
         Parameter = parameter,
         ParameterType = paramType,
         IsNullable = isNullable,
-        UseDynamic = parameter.GetAttribute<AllowDynamicAttribute>() is not null
+        UseDynamic = serviceManifest.AllowDynamicResolution && parameter.GetAttribute<AllowDynamicAttribute>() is not null
     };
 
     // Check for FromKeyedServices attribute

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,7 +58,7 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
     }
 
     {{#withIndent '    '}}
-    {{> ServiceTypeResolution providerInstance='this'}}
+    {{> ServiceTypeResolution isScope=false providerInstance='this'}}
     {{/withIndent}}    
 
     {{#WithDynamicServices}}
@@ -209,7 +210,7 @@ partial class {{ClassName}} : ICompileTimeServiceProvider,
       }
 
       {{#withIndent '      '}}
-      {{> ServiceTypeResolution providerInstance='this'}}
+      {{> ServiceTypeResolution isScope=true providerInstance='this'}}
       {{/withIndent}}
       
       {{#WithDynamicServices}}

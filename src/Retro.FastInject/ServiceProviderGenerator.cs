@@ -122,6 +122,8 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
         .GroupBy(x => x.Type, TypeSymbolEqualityComparer.Instance)
         .Select(x => new {
             ServiceType = x.Key.ToDisplayString(),
+            IsCollection = x.Key is INamedTypeSymbol { IsGenericType: true } generic && generic.IsGenericCollectionType(),
+            AppendCollections = services.AllowDynamicServices,
             Options = x.Select(y => ServiceInjection.FromResolution(y, 
                     constructorResolutions.TryGetValue(x.Key, out var parameters) ? parameters : []))
                 .ToList()

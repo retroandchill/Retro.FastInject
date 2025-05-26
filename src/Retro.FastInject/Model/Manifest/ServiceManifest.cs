@@ -20,6 +20,8 @@ public class ServiceManifest {
 
   private readonly Dictionary<ITypeSymbol, ConstructorResolution> _constructorResolutions =
       new(TypeSymbolEqualityComparer.Instance);
+  
+  public bool AllowDynamicResolution { get; init; } = false;
 
   /// <summary>
   /// Gets all constructor resolutions that have been recorded.

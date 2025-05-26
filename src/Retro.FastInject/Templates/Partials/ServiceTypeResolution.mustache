@@ -1,3 +1,4 @@
 ﻿{{#RegularServices}}
-if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) {{../providerInstance}}).GetService();
+if (serviceType == typeof({{ServiceType}})) return ((IServiceProvider<{{ServiceType}}>) {{../providerInstance}}).GetService()
+{{~#IsCollection~}}{{~#AppendCollections~}}.Concat(({{ServiceType}}) {{~#if ../isScope~}}_hybridServiceScope{{~else~}}_hybridServiceProvider{{~/if~}}.GetService<{{ServiceType}}>([])).ToImmutableArray(){{~/AppendCollections~}}{{~/IsCollection~}};
 {{/RegularServices}}

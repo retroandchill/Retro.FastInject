@@ -29,16 +29,27 @@ public record ResolvedInjection {
   /// of services of the same type, when applicable. It is null if no index is assigned.
   /// </summary>
   public required int? Index { get; init; }
-  
+
+  /// <summary>
+  /// Determines whether the resolved injection represents a collection of services.
+  /// This property is set based on the type, identifying if the service type
+  /// is a generic collection.
+  /// </summary>
   public bool IsCollection { get; init; }
-  
+
+  /// <summary>
+  /// Indicates whether dynamic resolution is enabled for this injection.
+  /// When set to true, the service resolution will leverage dynamic runtime mechanisms
+  /// instead of precompiled static logic, allowing greater flexibility for complex scenarios.
+  /// </summary>
   public bool UseDynamic { get; init; }
 
   /// <summary>
-  /// Creates a <see cref="ResolvedInjection"/> instance from a given <see cref="ServiceRegistration"/>.
+  /// Creates a ResolvedInjection instance from the specified ServiceRegistration and configuration.
   /// </summary>
-  /// <param name="registration">The service registration containing information about the service type, name, and index.</param>
-  /// <returns>An instance of <see cref="ResolvedInjection"/> populated with information from the provided service registration.</returns>
+  /// <param name="registration">The service registration containing details about the type, name, and index of the service.</param>
+  /// <param name="useDynamic">Indicates whether dynamic resolution should be used for this instance.</param>
+  /// <returns>An instance of ResolvedInjection with properties populated based on the provided service registration and configuration.</returns>
   public static ResolvedInjection FromRegistration(ServiceRegistration registration, bool useDynamic) {
     return new ResolvedInjection {
         ServiceName = registration.Type.GetSanitizedTypeName(),
