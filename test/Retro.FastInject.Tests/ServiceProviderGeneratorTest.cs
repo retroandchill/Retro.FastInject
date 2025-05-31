@@ -241,6 +241,57 @@ public class ServiceProviderGeneratorTests {
     });
   }
   
+  [Test]
+  public async Task Generator_WithGenericFactoryMethod_ShouldGenerateValidCode() {
+    // Arrange
+    const string source = """
+                          using System;
+                          using Retro.FastInject.Annotations;
+                          namespace TestNamespace {
+                              public interface IRepository<T> {
+                                  T GetById(int id);
+                              }
+                              
+                              public class Repository<T> : IRepository<T> {
+                                  public T GetById(int id) => default;
+                              }
+                              
+                              public class UserService {
+                                  private readonly IRepository<User> _userRepository;
+                                  
+                                  public UserService(IRepository<User> userRepository) {
+                                      _userRepository = userRepository;
+                                  }
+                                  
+                                  public User GetUser(int id) => _userRepository.GetById(id);
+                              }
+                              
+                              public class User {
+                                  public int Id { get; set; }
+                                  public string Name { get; set; }
+                              }
+                              
+                              [ServiceProvider]
+                              [Singleton<UserService>]
+                              public partial class TestServiceProvider {
+                                  [Factory]
+                                  public IRepository<T> CreateRepository<T>() {
+                                      return new Repository<T>();
+                                  }
+                              }
+                          }
+                          """;
+  
+    // Act
+    var (diagnostics, output) = await RunGenerator(source);
+  
+    // Assert
+    Assert.Multiple(() => {
+      Assert.That(diagnostics, Is.Empty);
+      Assert.That(output.SyntaxTrees.Count(), Is.GreaterThan(1));
+    });
+  }
+  
   private static Task<(ImmutableArray<Diagnostic> Diagnostics, Compilation Output)> RunGenerator(string source) {
     var compilation = CreateCompilation(source, typeof(ServiceProviderAttribute));
     var generator = new ServiceProviderGenerator();

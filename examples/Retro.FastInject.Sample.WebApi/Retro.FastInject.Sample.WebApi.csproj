@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2"/>
+        <PackageReference Include="Retro.ReadOnlyParams" Version="1.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\Retro.FastInject.Annotations\Retro.FastInject.Annotations.csproj" />
+      <ProjectReference Include="..\..\src\Retro.FastInject.Core\Retro.FastInject.Core.csproj" />
+      <ProjectReference Include="..\..\src\Retro.FastInject.Dynamic\Retro.FastInject.Dynamic.csproj" />
+      <ProjectReference Include="..\..\src\Retro.FastInject\Retro.FastInject.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+    </ItemGroup>
+
+</Project>

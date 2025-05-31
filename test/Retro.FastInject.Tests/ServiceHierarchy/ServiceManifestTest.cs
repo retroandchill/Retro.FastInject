@@ -9,6 +9,7 @@ using Retro.FastInject.Annotations;
 using Retro.FastInject.Generation;
 using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Tests.Utils;
+using Retro.FastInject.Utils;
 
 namespace Retro.FastInject.Tests.ServiceHierarchy;
 
@@ -60,7 +61,7 @@ public class ServiceManifestTest {
 
     // Verify the constructor resolution
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
+        SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
@@ -115,7 +116,7 @@ public class ServiceManifestTest {
 
     // Verify the correct specializations in multi consumer
     var multiResolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                      SymbolEqualityComparer.Default.Equals(r.Type, multiConsumerType));
+        SymbolEqualityComparer.Default.Equals(r.Type, multiConsumerType));
 
     Assert.That(multiResolution, Is.Not.Null);
     Assert.That(multiResolution.Parameters, Has.Count.EqualTo(2));
@@ -169,14 +170,14 @@ public class ServiceManifestTest {
 
     // Verify the constructor resolution
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
+        SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
 
     var paramResolution = resolution.Parameters[0];
     Assert.That(paramResolution.Parameter.Type.ToDisplayString(),
-                Is.EqualTo("Test.IService<Test.IRepository<Test.User>, Test.User>"));
+        Is.EqualTo("Test.IService<Test.IRepository<Test.User>, Test.User>"));
   }
 
   [Test]
@@ -218,7 +219,7 @@ public class ServiceManifestTest {
 
     // Verify the constructor resolution
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
+        SymbolEqualityComparer.Default.Equals(r.Type, consumerType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
@@ -247,7 +248,7 @@ public class ServiceManifestTest {
 
     // Act & Assert
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
     Assert.That(ex?.Message, Contains.Substring("is not a named type"));
   }
 
@@ -271,7 +272,7 @@ public class ServiceManifestTest {
 
     // Act & Assert
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
     Assert.That(ex?.Message, Contains.Substring("has multiple public constructors"));
   }
 
@@ -325,7 +326,7 @@ public class ServiceManifestTest {
 
     // Act & Assert
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
   }
 
@@ -469,7 +470,7 @@ public class ServiceManifestTest {
     // Act & Assert - should not throw an exception
     Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
-  
+
   [Test]
   public void ValidateDependencyGraph_WithValueTypeAndNullableValueTypeCycle_ThrowsInvalidOperationException() {
     // Create a class structure with circular dependency involving a value type and its nullable version
@@ -484,22 +485,22 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var valueServiceType = compilation.GetTypeSymbol("Test.ValueService");
     var nullableConsumerType = compilation.GetTypeSymbol("Test.NullableValueConsumer");
-  
+
     // Register services in the manifest
     var regValueService = _manifest.AddService(valueServiceType, ServiceScope.Singleton);
     var regNullableConsumer = _manifest.AddService(nullableConsumerType, ServiceScope.Singleton);
-  
+
     // Check dependencies to build the constructor resolutions
     _manifest.CheckConstructorDependencies(regValueService, compilation);
     _manifest.CheckConstructorDependencies(regNullableConsumer, compilation);
-  
+
     // Act & Assert
     var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
-  
+
     // Verify the exception message contains the circular dependency information
     Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
     Assert.That(exception.Message, Does.Contain("ValueService"));
@@ -598,14 +599,14 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
 
     var paramResolution = resolution.Parameters[0];
     Assert.That(paramResolution.Parameter.Type.ToDisplayString(),
-                Is.EqualTo("System.Collections.Generic.IEnumerable<Test.IPlugin>"));
+        Is.EqualTo("System.Collections.Generic.IEnumerable<Test.IPlugin>"));
   }
 
   [Test]
@@ -647,14 +648,14 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
 
     var paramResolution = resolution.Parameters[0];
     Assert.That(paramResolution.Parameter.Type.ToDisplayString(),
-                Is.EqualTo("System.Collections.Generic.IReadOnlyCollection<Test.IStrategy>"));
+        Is.EqualTo("System.Collections.Generic.IReadOnlyCollection<Test.IStrategy>"));
   }
 
   [Test]
@@ -696,14 +697,14 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
 
     var paramResolution = resolution.Parameters[0];
     Assert.That(paramResolution.Parameter.Type.ToDisplayString(),
-                Is.EqualTo("System.Collections.Generic.IReadOnlyList<Test.IHandler>"));
+        Is.EqualTo("System.Collections.Generic.IReadOnlyList<Test.IHandler>"));
   }
 
   [Test]
@@ -745,14 +746,14 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
 
     var paramResolution = resolution.Parameters[0];
     Assert.That(paramResolution.Parameter.Type.ToDisplayString(),
-                Is.EqualTo("System.Collections.Immutable.ImmutableArray<Test.IValidator>"));
+        Is.EqualTo("System.Collections.Immutable.ImmutableArray<Test.IValidator>"));
   }
 
   [Test]
@@ -799,7 +800,7 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(4));
@@ -832,7 +833,7 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
@@ -863,7 +864,7 @@ public class ServiceManifestTest {
     // Act & Assert
     // This should fail because there are no implementations of INotRegistered
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
 
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
   }
@@ -901,7 +902,7 @@ public class ServiceManifestTest {
     // Act & Assert
     // This should fail because the wrong key is requested
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
 
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
     Assert.That(ex?.Message, Contains.Substring("with key 'wrongKey'"));
@@ -940,7 +941,7 @@ public class ServiceManifestTest {
     // Act & Assert
     // This should fail because we're requesting a keyed service but it's registered without a key
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
 
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
     Assert.That(ex?.Message, Contains.Substring("with key 'someKey'"));
@@ -981,7 +982,7 @@ public class ServiceManifestTest {
     // Act & Assert
     // This should fail because there are multiple implementations of IMultiService without a key
     var ex = Assert.Throws<InvalidOperationException>(() =>
-                                                          _manifest.CheckConstructorDependencies(registration, compilation));
+        _manifest.CheckConstructorDependencies(registration, compilation));
 
     Assert.That(ex?.Message, Contains.Substring("Cannot resolve the following dependencies"));
     Assert.That(ex?.Message, Contains.Substring("Multiple registrations found: 2"));
@@ -1028,7 +1029,7 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
@@ -1085,7 +1086,7 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(2));
@@ -1100,7 +1101,7 @@ public class ServiceManifestTest {
     // Second parameter should be the collection
     var collectionParamResolution = resolution.Parameters[1];
     Assert.That(collectionParamResolution.Parameter.Type.ToDisplayString(),
-                Is.EqualTo("System.Collections.Generic.IEnumerable<Test.IMultiService>"));
+        Is.EqualTo("System.Collections.Generic.IEnumerable<Test.IMultiService>"));
   }
 
   [Test]
@@ -1144,7 +1145,7 @@ public class ServiceManifestTest {
 
     // Verify that the constructor resolution has been stored with correct lifetime
     var resolution = _manifest.GetAllConstructorResolutions().FirstOrDefault(r =>
-                                                                                 SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
+        SymbolEqualityComparer.Default.Equals(r.Type, serviceType));
 
     Assert.That(resolution, Is.Not.Null);
     Assert.That(resolution.Parameters, Has.Count.EqualTo(1));
@@ -1159,16 +1160,16 @@ public class ServiceManifestTest {
       Assert.That(SymbolEqualityComparer.Default.Equals(paramResolution.SelectedService.Type, singletonType), Is.True);
     });
   }
-  
+
   [Test]
   public void CheckConstructorDependencies_WithInterfacePlugins_ResolveCorrectCollection() {
     // Create a test with interface-based plugins and collection injection
     const string code = """
                         using System.Collections.Immutable;
-  
+
                         namespace Test {
                           public interface IBasePlugin {}
-                        
+
                           public class GenericPlugin<T> : IBasePlugin { }
                           
                           public class ConcretePlugin : IBasePlugin { }
@@ -1183,52 +1184,52 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
-    
+
     // Get all type symbols
     var basePluginType = compilation.GetTypeSymbol("Test.IBasePlugin");
     var genericPluginType = compilation.GetTypeSymbol("Test.GenericPlugin`1");
     var concretePluginType = compilation.GetTypeSymbol("Test.ConcretePlugin");
     var collectionConsumerType = compilation.GetTypeSymbol("Test.CollectionConsumer");
     var stringConsumerType = compilation.GetTypeSymbol("Test.StringConsumer");
-    
+
     // Step 1: Register all the plugins
     // Register concrete plugin
     _manifest.AddService(concretePluginType, ServiceScope.Singleton);
     _manifest.AddService(basePluginType, ServiceScope.Singleton, concretePluginType);
-    
+
     // Register generic plugin
     _manifest.AddService(genericPluginType, ServiceScope.Singleton);
     _manifest.AddService(basePluginType, ServiceScope.Singleton, genericPluginType);
-    
+
     // Step 2: Register and resolve consumers
     var collectionConsumerReg = new ServiceRegistration { Type = collectionConsumerType };
     var stringConsumerReg = new ServiceRegistration { Type = stringConsumerType };
-    
+
     // Resolve dependencies for both consumers
     _manifest.CheckConstructorDependencies(collectionConsumerReg, compilation);
     _manifest.CheckConstructorDependencies(stringConsumerReg, compilation);
-    
+
     // Step 3: Verify that StringConsumer resolved its dependency correctly
     var stringResolution = _manifest.GetAllConstructorResolutions()
         .First(r => SymbolEqualityComparer.Default.Equals(r.Type, stringConsumerType));
-    
+
     Assert.That(stringResolution.Parameters, Has.Count.EqualTo(1));
-    Assert.That(stringResolution.Parameters[0].Parameter.Type.ToDisplayString(), 
+    Assert.That(stringResolution.Parameters[0].Parameter.Type.ToDisplayString(),
         Is.EqualTo("Test.GenericPlugin<string>"));
-    
+
     // Step 4: Verify that CollectionConsumer has a collection with both plugins
     var collectionResolution = _manifest.GetAllConstructorResolutions()
         .First(r => SymbolEqualityComparer.Default.Equals(r.Type, collectionConsumerType));
-    
+
     Assert.That(collectionResolution.Parameters, Has.Count.EqualTo(1));
-    
+
     var collectedServices = collectionResolution.Parameters[0].SelectedService?.CollectedServices;
     Assert.That(collectedServices, Is.Not.Null);
     Assert.That(collectedServices, Has.Count.EqualTo(2), "Collection should contain exactly 2 plugins");
   }
-  
+
   [Test]
   public void ValidateDependencyGraph_WithIEnumerableCircularDependency_ThrowsInvalidOperationException() {
     // Create a class structure with circular dependency involving an IEnumerable:
@@ -1236,7 +1237,7 @@ public class ServiceManifestTest {
     // ServiceB depends on ServiceA, creating a cycle
     const string code = """
                         using System.Collections.Generic;
-                        
+
                         namespace Test {
                           public interface IService { }
                           
@@ -1249,39 +1250,39 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
     var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
     var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService");
-  
+
     // Register services in the manifest
     var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
     var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
-    
+
     // Register interface implementations
     _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, serviceBType);
-  
+
     // Check dependencies to build the constructor resolutions
     _manifest.CheckConstructorDependencies(regA, compilation);
     _manifest.CheckConstructorDependencies(regB, compilation);
-  
+
     // Act & Assert
     var exception = Assert.Throws<InvalidOperationException>(() => _manifest.ValidateDependencyGraph());
-  
+
     // Verify the exception message contains the circular dependency information
     Assert.That(exception.Message, Does.Contain("Detected circular dependency:"));
     Assert.That(exception.Message, Does.Contain("ServiceA"));
     Assert.That(exception.Message, Does.Contain("ServiceB"));
     Assert.That(exception.Message, Does.Contain("→")); // Contains the arrow character used in formatting
   }
-  
+
   [Test]
   public void ValidateDependencyGraph_WithLazySingletonCircularDependency_Succeeds() {
     // Create a class structure with circular dependency, but one uses Lazy<T>
     const string code = """
                         using System;
-                        
+
                         namespace Test {
                           public class ServiceA {
                             public ServiceA(Lazy<ServiceB> serviceB) { }
@@ -1292,29 +1293,29 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
     var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
-  
+
     // Register services in the manifest as singletons
     var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
     var regB = _manifest.AddService(serviceBType, ServiceScope.Singleton);
-  
+
     // Check dependencies to build the constructor resolutions
     _manifest.CheckConstructorDependencies(regA, compilation);
     _manifest.CheckConstructorDependencies(regB, compilation);
-  
+
     // Act & Assert - should not throw because Lazy<T> breaks the cycle
     Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
-  
+
   [Test]
   public void ValidateDependencyGraph_WithLazyScopedCircularDependency_Succeeds() {
     // Create a class structure with circular dependency where one is scoped, one is singleton
     const string code = """
                         using System;
-                        
+
                         namespace Test {
                           public class ServiceA {
                             public ServiceA(Lazy<ServiceB> serviceB) { }
@@ -1325,29 +1326,29 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
     var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
-  
+
     // Register one as singleton, one as scoped
     var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
     var regB = _manifest.AddService(serviceBType, ServiceScope.Scoped);
-  
+
     // Check dependencies to build the constructor resolutions
     _manifest.CheckConstructorDependencies(regA, compilation);
     _manifest.CheckConstructorDependencies(regB, compilation);
-  
+
     // Act & Assert - should not throw because Lazy<T> breaks the cycle
     Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
   }
-  
+
   [Test]
   public void ValidateDependencyGraph_WithLazyTransientCircularDependency_ThrowsInvalidOperationException() {
     // Create a class structure with circular dependency where both are transient
     const string code = """
                         using System;
-                        
+
                         namespace Test {
                           public class ServiceA {
                             public ServiceA(Lazy<ServiceB> serviceB) { }
@@ -1358,31 +1359,31 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
     var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
-  
+
     // Register both as transient
     var regA = _manifest.AddService(serviceAType, ServiceScope.Transient);
     var regB = _manifest.AddService(serviceBType, ServiceScope.Transient);
-  
+
     // Check dependencies to build the constructor resolutions
     Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(regB, compilation));
     var exception = Assert.Throws<InvalidOperationException>(() => _manifest.CheckConstructorDependencies(regA, compilation));
-  
+
     // Verify the exception message contains the circular dependency information
     Assert.That(exception.Message, Does.Contain("Lazy transient cycle detected"));
     Assert.That(exception.Message, Does.Contain("ServiceA"));
     Assert.That(exception.Message, Does.Contain("ServiceB"));
   }
-  
+
   [Test]
   public void ValidateDependencyGraph_WithLazyMixedCircularDependency_Succeeds() {
     // Create a more complex structure with multiple services and mixed lifetime scopes
     const string code = """
                         using System;
-                        
+
                         namespace Test {
                           public interface IService { }
                           
@@ -1399,27 +1400,180 @@ public class ServiceManifestTest {
                           }
                         }
                         """;
-  
+
     var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
     var serviceAType = compilation.GetTypeSymbol("Test.ServiceA");
     var serviceBType = compilation.GetTypeSymbol("Test.ServiceB");
     var serviceCType = compilation.GetTypeSymbol("Test.ServiceC");
     var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService");
-  
+
     // Register the services with different lifetimes
     var regA = _manifest.AddService(serviceAType, ServiceScope.Singleton);
     var regB = _manifest.AddService(serviceBType, ServiceScope.Scoped);
     var regC = _manifest.AddService(serviceCType, ServiceScope.Transient);
-    
+
     // Register interface implementations
     _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, serviceAType);
-  
+
     // Check dependencies to build the constructor resolutions
     _manifest.CheckConstructorDependencies(regA, compilation);
     _manifest.CheckConstructorDependencies(regB, compilation);
     _manifest.CheckConstructorDependencies(regC, compilation);
-  
+
     // Act & Assert - should not throw because Lazy<T> breaks the cycle
     Assert.DoesNotThrow(() => _manifest.ValidateDependencyGraph());
+  }
+
+  [Test]
+  public void CheckConstructorDependencies_WithGenericFactoryMethod_SpecializesCorrectly() {
+    // Create a class structure with a generic factory method
+    const string code = """
+                        using Retro.FastInject.Annotations;
+
+                        namespace Test {
+                          public interface IRepository<T> { }
+                          
+                          public class Repository<T> : IRepository<T> { }
+                          
+                          public static class RepositoryFactory {
+                            [Factory]
+                            public static IRepository<T> Create<T>() {
+                              return new Repository<T>();
+                            }
+                          }
+                          
+                          public class StringConsumer {
+                            public StringConsumer(IRepository<string> repo) { }
+                          }
+                          
+                          public class IntConsumer {
+                            public IntConsumer(IRepository<int> repo) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var stringConsumerType = compilation.GetTypeSymbol("Test.StringConsumer");
+    var intConsumerType = compilation.GetTypeSymbol("Test.IntConsumer");
+    var repoInterfaceType = compilation.GetTypeSymbol("Test.IRepository`1");
+    var factoryMethod = compilation.GetMethodSymbol("Test.RepositoryFactory", "Create");
+
+    // Register the factory method that can create specialized repositories
+    _manifest.AddService(repoInterfaceType, ServiceScope.Singleton, associatedSymbol: factoryMethod);
+
+    // Arrange
+    var stringConsumerReg = new ServiceRegistration { Type = stringConsumerType };
+    var intConsumerReg = new ServiceRegistration { Type = intConsumerType };
+
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(stringConsumerReg, compilation));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(intConsumerReg, compilation));
+
+    // Verify the correct specializations were resolved
+    var stringResolution = _manifest.GetAllConstructorResolutions()
+        .FirstOrDefault(r => SymbolEqualityComparer.Default.Equals(r.Type, stringConsumerType));
+
+    var intResolution = _manifest.GetAllConstructorResolutions()
+        .FirstOrDefault(r => SymbolEqualityComparer.Default.Equals(r.Type, intConsumerType));
+
+    Assert.That(stringResolution, Is.Not.Null);
+    Assert.That(stringResolution.Parameters, Has.Count.EqualTo(1));
+    Assert.Multiple(() => {
+      Assert.That(stringResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IRepository<string>"));
+
+      Assert.That(intResolution, Is.Not.Null);
+    });
+    Assert.That(intResolution.Parameters, Has.Count.EqualTo(1));
+    Assert.That(intResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IRepository<int>"));
+  }
+
+  [Test]
+  public void CheckConstructorDependencies_WithMultipleGenericFactoryMethods_ResolvesCorrectly() {
+    // Create a class structure with multiple generic factory methods
+    const string code = """
+                        using Retro.FastInject.Annotations;
+                        using Microsoft.Extensions.DependencyInjection;
+
+                        namespace Test {
+                          public interface IService<T> { }
+                          
+                          public class DefaultService<T> : IService<T> { }
+                          
+                          public class SpecializedStringService : IService<string> { }
+                          
+                          public static class ServiceFactory {
+                            [Factory]
+                            public static IService<T> CreateDefault<T>() {
+                              return new DefaultService<T>();
+                            }
+                            
+                            [Factory(Key = "specialized")]
+                            public static IService<string> CreateStringService() {
+                              return new SpecializedStringService();
+                            }
+                          }
+                          
+                          public class DefaultConsumer {
+                            public DefaultConsumer(IService<int> intService) { }
+                          }
+                          
+                          public class SpecializedConsumer {
+                            public SpecializedConsumer([FromKeyedServices("specialized")] IService<string> stringService) { }
+                          }
+                          
+                          public class RegularConsumer {
+                            public RegularConsumer(IService<string> stringService) { }
+                          }
+                        }
+                        """;
+
+    var compilation = GeneratorTestHelpers.CreateCompilation(code, _references);
+    var defaultConsumerType = compilation.GetTypeSymbol("Test.DefaultConsumer");
+    var specializedConsumerType = compilation.GetTypeSymbol("Test.SpecializedConsumer");
+    var regularConsumerType = compilation.GetTypeSymbol("Test.RegularConsumer");
+    var serviceInterfaceType = compilation.GetTypeSymbol("Test.IService`1");
+    var specializedInterfaceType = serviceInterfaceType.GetInstantiatedGeneric(compilation.GetSpecialType(SpecialType.System_String));
+    var defaultFactoryMethod = compilation.GetMethodSymbol("Test.ServiceFactory", "CreateDefault");
+    var specializedFactoryMethod = compilation.GetMethodSymbol("Test.ServiceFactory", "CreateStringService");
+
+    // Register the factory methods
+    _manifest.AddService(serviceInterfaceType, ServiceScope.Singleton, associatedSymbol: defaultFactoryMethod);
+    _manifest.AddService(specializedInterfaceType, ServiceScope.Singleton, associatedSymbol: specializedFactoryMethod, key: "specialized");
+
+    // Arrange
+    var defaultConsumerReg = new ServiceRegistration { Type = defaultConsumerType };
+    var specializedConsumerReg = new ServiceRegistration { Type = specializedConsumerType };
+    var regularConsumerReg = new ServiceRegistration { Type = regularConsumerType };
+
+    // Act & Assert
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(defaultConsumerReg, compilation));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(specializedConsumerReg, compilation));
+    Assert.DoesNotThrow(() => _manifest.CheckConstructorDependencies(regularConsumerReg, compilation));
+
+    // Verify the correct specializations and factory methods were resolved
+    var defaultResolution = _manifest.GetAllConstructorResolutions()
+        .FirstOrDefault(r => SymbolEqualityComparer.Default.Equals(r.Type, defaultConsumerType));
+
+    var specializedResolution = _manifest.GetAllConstructorResolutions()
+        .FirstOrDefault(r => SymbolEqualityComparer.Default.Equals(r.Type, specializedConsumerType));
+
+    var regularResolution = _manifest.GetAllConstructorResolutions()
+        .FirstOrDefault(r => SymbolEqualityComparer.Default.Equals(r.Type, regularConsumerType));
+
+    Assert.That(defaultResolution, Is.Not.Null);
+    Assert.That(defaultResolution.Parameters, Has.Count.EqualTo(1));
+    Assert.Multiple(() => {
+      Assert.That(defaultResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IService<int>"));
+
+      Assert.That(specializedResolution, Is.Not.Null);
+    });
+    Assert.That(specializedResolution.Parameters, Has.Count.EqualTo(1));
+    Assert.Multiple(() => {
+      Assert.That(specializedResolution.Parameters[0].Key, Is.EqualTo("specialized"));
+
+      Assert.That(regularResolution, Is.Not.Null);
+    });
+    Assert.That(regularResolution.Parameters, Has.Count.EqualTo(1));
+    Assert.That(regularResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IService<string>"));
   }
 }

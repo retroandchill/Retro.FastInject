@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
+using Retro.FastInject.Core.Exceptions;
 
 namespace Retro.FastInject.Dynamic;
 
@@ -16,8 +17,7 @@ namespace Retro.FastInject.Dynamic;
 public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : ICompileTimeServiceProvider, ICompileTimeScopeFactory {
   private Scope? _rootScope;
   private readonly Dictionary<Type, List<ServiceDescriptor>> _descriptors = new();
-  private readonly Dictionary<Type, Dictionary<object, List<ServiceDescriptor>>> _keyedDescriptors = new();
-  private readonly Dictionary<ServiceDescriptor, object> _singletonInstances = new();
+  private readonly Dictionary<ServiceInstance, object> _singletonInstances = new();
   private readonly T _compileTimeServiceProvider;
 
 
@@ -41,27 +41,12 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
 
     // Organize descriptors by service type and lifetime
     foreach (var descriptor in services) {
-
-      if (descriptor.ServiceKey is not null) {
-        if (!_keyedDescriptors.TryGetValue(descriptor.ServiceType, out var keyedServices)) {
-          keyedServices = new Dictionary<object, List<ServiceDescriptor>>();
-          _keyedDescriptors[descriptor.ServiceType] = keyedServices;
-        }
-
-        if (!keyedServices.TryGetValue(descriptor.ServiceKey, out var descriptorsList)) {
-          descriptorsList = [];
-          keyedServices[descriptor.ServiceKey] = descriptorsList;
-        }
-
-        descriptorsList.Add(descriptor);
-      } else {
-        if (!_descriptors.TryGetValue(descriptor.ServiceType, out var descriptorsList)) {
-          descriptorsList = [];
-          _descriptors[descriptor.ServiceType] = descriptorsList;
-        }
-
-        descriptorsList.Add(descriptor);
+      if (!_descriptors.TryGetValue(descriptor.ServiceType, out var descriptorsList)) {
+        descriptorsList = [];
+        _descriptors[descriptor.ServiceType] = descriptorsList;
       }
+
+      descriptorsList.Add(descriptor);
     }
   }
 
@@ -114,19 +99,69 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       return this;
     }
 
-    if (CheckCollectionInjection(this, GetRootScope(), serviceType, out var asReadOnly)) {
+    return GetService(serviceType, GetRootScope());
+  }
+
+  private object? GetService(Type serviceType, Scope currentScope) {
+    if (_descriptors.TryGetValue(serviceType, out var descriptors) && descriptors.Count > 0) {
+      // Always use the last registered service when multiple registrations exist
+      try {
+        return descriptors
+            .Select(x => ResolveService(serviceType, x, GetRootScope(), _compileTimeServiceProvider))
+            .Single();
+      } catch (InvalidOperationException ex) {
+        throw new DependencyResolutionException($"Multiple services of type '{serviceType}' are registered.", ex);
+      }
+    }
+
+    if (!serviceType.IsGenericType) {
+      return null;
+    }
+
+    if (CheckCollectionInjection(currentScope, serviceType, out var asReadOnly)) {
       return asReadOnly;
     }
 
-    if (CheckLazyInjection(serviceType, _compileTimeServiceProvider, out var lazyService)) return lazyService;
-
-    if (!_descriptors.TryGetValue(serviceType, out var descriptors) || descriptors.Count <= 0) return null;
-
-    // Always use the last registered service when multiple registrations exist
-    var descriptor = descriptors[^1];
-    return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
+    if (CheckLazyInjection(serviceType, null, _compileTimeServiceProvider, out var lazyService)) {
+      return lazyService;
+    }
+    
+    return CheckGenericInjection(serviceType, null, out var genericService) ? genericService : null;
   }
+  
+  private bool CheckCollectionInjection(Scope currentScope, Type serviceType, out object? asReadOnly) {
+    asReadOnly = null;
+    
+    // Check if this is a collection type
+    if (!IsCollectionType(serviceType, out var elementType)) {
+      return false;
+    }
+
+    // Get all registered services of the element type
+    if (!_descriptors.TryGetValue(elementType, out var descriptors) || descriptors.Count <= 0) {
+      asReadOnly = elementType.CreateEmptyArray();
+      return true;
+    }
+    
+    // Create an array of all services
+    var services = descriptors
+        .Select(descriptor => ResolveService(serviceType, descriptor, currentScope, _compileTimeServiceProvider))
+        .Where(service => service != null);
+
+    // Return empty collection
+    return ResolveFoundServices(services, elementType, out asReadOnly);
+
+  }
+  
+  private static bool ResolveFoundServices(IEnumerable<object?> services, 
+                                           Type elementType, out object? asReadOnly) {
+    var castServices = services.CastEnumerable(elementType);
+    asReadOnly = castServices.CastImmutableArray(elementType);
+    return true;
+  }
+  
   private static bool CheckLazyInjection(Type serviceType, 
+                                         object? serviceKey,
                                          IServiceProvider context, 
                                          out object? lazyService) {
     if (!IsLazyType(serviceType, out var lazyContents)) {
@@ -137,65 +172,37 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     var lazyType = typeof(Lazy<>).MakeGenericType(lazyContents);
     var funcType = typeof(Func<>).MakeGenericType(lazyContents);
     var lazyConstructor = lazyType.GetConstructor([funcType])!;
-    
-    var funcMethod = typeof(ServiceProviderServiceExtensions).GetMethods()
-        .Where(x => x.Name == nameof(ServiceProviderServiceExtensions.GetRequiredService))
-        .Select(m => new {
-            Method = m,
-            Params = m.GetParameters(),
-            Args = m.GetGenericArguments()
-        })
-        .Where(x => x.Params.Length == 1
-                    && x.Args.Length == 1)
-        .Select(x => x.Method.MakeGenericMethod(lazyContents))
-        .First();
+
+    var providerType = typeof(ServiceRetriever<>).MakeGenericType(lazyContents);
+    var constructor = providerType.GetConstructor([typeof(IServiceProvider), typeof(object)])!;
+    var provider = constructor.Invoke([context, serviceKey]);
+    var delegatingMethod = providerType.GetMethod(nameof(ServiceRetriever<object>.GetService))!;
     
     // Create a delegate that will resolve the service when needed
-    var valueFactory = Delegate.CreateDelegate(funcType, context, 
-        funcMethod);
+    var valueFactory = Delegate.CreateDelegate(funcType, provider, delegatingMethod);
 
     // Create the Lazy instance using the constructor and delegate
     lazyService = lazyConstructor.Invoke([valueFactory]);
     return true;
   }
-  private static bool CheckCollectionInjection(HybridServiceProvider<T> serviceProvider, 
-                                               Scope currentScope, Type serviceType, out object? asReadOnly) {
-    asReadOnly = null;
+
+  private bool CheckGenericInjection(Type serviceType, object? serviceKey, out object? genericService) {
+    var unboundType = serviceType.GetGenericTypeDefinition();
     
-    // Check if this is a collection type
-    if (!IsCollectionType(serviceType, out var elementType)) {
+    if (!_descriptors.TryGetValue(unboundType, out var descriptors) || descriptors.Count <= 0) {
+      genericService = null;
       return false;
     }
 
-    // Get all registered services of the element type
-    if (!serviceProvider._descriptors.TryGetValue(elementType, out var descriptors) || descriptors.Count <= 0) {
-      asReadOnly = elementType.CreateEmptyArray();
-      return true;
+    try {
+      genericService = descriptors
+          .Where(x => serviceKey is null || x.ServiceKey == serviceKey)
+          .Select(descriptor => ResolveService(serviceType, descriptor, GetRootScope(), _compileTimeServiceProvider))
+          .SingleOrDefault();
+      return genericService is not null;
+    } catch (InvalidOperationException ex) {
+      throw new DependencyResolutionException($"Multiple services of type '{serviceType}' are registered.", ex);
     }
-    
-    // Create an array of all services
-    var services = descriptors
-        .Select(descriptor => serviceProvider.ResolveService(descriptor, currentScope, serviceProvider._compileTimeServiceProvider))
-        .Where(service => service != null);
-
-    // Return empty collection
-    return ResolveFoundServices(serviceType, services, elementType, out asReadOnly);
-
-  }
-  
-  private static bool ResolveFoundServices(Type serviceType, IEnumerable<object?> services, 
-                                           Type elementType, out object? asReadOnly) {
-    var castServices = services.CastEnumerable(serviceType);
-          
-    // If it's an actual collection type, return the array directly
-    if (serviceType.GetGenericTypeDefinition() != typeof(IEnumerable<>)) {
-      asReadOnly = castServices.CastImmutableArray(elementType);
-      return true;
-    }
-      
-    // For other collection types, return the immutable array which implements all the interfaces
-    asReadOnly = castServices;
-    return true;
   }
 
   /// <summary>
@@ -205,17 +212,21 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
   /// <param name="serviceKey">The key of the service to get.</param>
   /// <returns>The service object or null if not found.</returns>
   public object? GetKeyedService(Type serviceType, object? serviceKey) {
-    if (serviceKey is null) {
-      return GetService(serviceType);
+    return serviceKey is null ? GetService(serviceType) : GetKeyedService(serviceType, serviceKey, GetRootScope());
+  }
+
+  private object? GetKeyedService(Type serviceType, object? serviceKey, Scope currentScope) {
+    if (!_descriptors.TryGetValue(serviceType, out var keyedServices)) return null;
+
+    // If we can't isolate to a single service, we should fail
+    try {
+      return keyedServices
+          .Where(x => x.IsKeyedService && x.ServiceKey == serviceKey)
+          .Select(x => ResolveService(serviceType, x, currentScope, _compileTimeServiceProvider))
+          .SingleOrDefault();
+    } catch (InvalidOperationException ex) {
+      throw new DependencyResolutionException($"Multiple services of type '{serviceType}' with key '{serviceKey}' are registered.", ex);
     }
-
-    if (!_keyedDescriptors.TryGetValue(serviceType, out var keyedServices) ||
-        !keyedServices.TryGetValue(serviceKey, out var descriptors) ||
-        descriptors.Count <= 0) return null;
-
-    // Always use the last registered service when multiple registrations exist
-    var descriptor = descriptors[^1];
-    return ResolveService(descriptor, GetRootScope(), _compileTimeServiceProvider);
   }
 
   /// <summary>
@@ -228,7 +239,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
   public object GetRequiredKeyedService(Type serviceType, object? serviceKey) {
     var service = GetKeyedService(serviceType, serviceKey);
     if (service is null) {
-      throw new InvalidOperationException($"Service of type '{serviceType}' with key '{serviceKey}' cannot be resolved.");
+      throw new DependencyResolutionException($"Service of type '{serviceType}' with key '{serviceKey}' cannot be resolved.");
     }
 
     return service;
@@ -242,24 +253,25 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     return new Scope(this, compileTimeServiceScope);
   }
 
-  private object? ResolveService(ServiceDescriptor descriptor, Scope currentScope, ICompileTimeServiceProvider root) {
+  private object? ResolveService(Type targetType, ServiceDescriptor descriptor, Scope currentScope, ICompileTimeServiceProvider root) {
+    var serviceKey = new ServiceInstance(targetType, descriptor);
     switch (descriptor.Lifetime) {
-      case ServiceLifetime.Singleton when _singletonInstances.TryGetValue(descriptor, out var instance):
+      case ServiceLifetime.Singleton when _singletonInstances.TryGetValue(serviceKey, out var instance):
         return instance;
       case ServiceLifetime.Singleton: {
-        var service = CreateServiceInstance(descriptor, currentScope.CompileTimeScope);
+        var service = CreateServiceInstance(targetType, descriptor, currentScope.CompileTimeScope);
         if (service is null) return service;
 
-        _singletonInstances[descriptor] = service;
+        _singletonInstances[serviceKey] = service;
         root.TryAddDisposable(service);
         return service;
       }
       case ServiceLifetime.Scoped:
-        return currentScope.ResolveService(descriptor);
+        return currentScope.ResolveService(targetType, descriptor);
       case ServiceLifetime.Transient:
       default: {
         // Transient
-        var service = CreateServiceInstance(descriptor, currentScope.CompileTimeScope);
+        var service = CreateServiceInstance(targetType, descriptor, currentScope.CompileTimeScope);
         if (service is not null) {
           currentScope.TryAddDisposable(service);
         }
@@ -268,7 +280,8 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     }
   }
 
-  private static object? CreateServiceInstance(ServiceDescriptor descriptor, 
+  private static object? CreateServiceInstance(Type serviceType,
+                                               ServiceDescriptor descriptor, 
                                                ICompileTimeServiceProvider currentScope) {
     Type implementationType;
     if (descriptor.ServiceKey is not null) {
@@ -281,7 +294,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       }
 
       if (descriptor.KeyedImplementationType is null) return null;
-      implementationType = descriptor.KeyedImplementationType;
+      implementationType = SpecializeIfNeeded(serviceType, descriptor.KeyedImplementationType);
     } else {
       if (descriptor.ImplementationFactory is not null) {
         return descriptor.ImplementationFactory(currentScope);
@@ -291,14 +304,17 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       }
       
       if (descriptor.ImplementationType is null) return null;
-      implementationType = descriptor.ImplementationType;
+      implementationType = SpecializeIfNeeded(serviceType, descriptor.ImplementationType);
     }
     
     try {
       return ResolveConstructorParameters(currentScope, implementationType);
     } catch (Exception ex) {
-      throw new InvalidOperationException($"Error resolving service '{descriptor.ServiceType}'", ex);
+      throw new DependencyResolutionException($"Error resolving service '{descriptor.ServiceType}'", ex);
     }
+  }
+  private static Type SpecializeIfNeeded(Type serviceType, Type implementationType) {
+    return implementationType.ContainsGenericParameters ? implementationType.MakeGenericType(serviceType.GenericTypeArguments) : implementationType;
   }
   private static object? ResolveConstructorParameters(ICompileTimeServiceProvider currentScope, Type implementationType) {
     // Find constructor with the most parameters that we can resolve
@@ -372,21 +388,8 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
         return this;
       }
 
-      if (serviceType == typeof(IServiceScopeFactory)) {
-        return _hybridServiceProvider;
-      }
+      return serviceType == typeof(IServiceScopeFactory) ? _hybridServiceProvider : _hybridServiceProvider.GetService(serviceType, this);
 
-      if (CheckCollectionInjection(_hybridServiceProvider, this, serviceType, out var asReadOnly)) {
-        return asReadOnly;
-      }
-      
-      if (CheckLazyInjection(serviceType, CompileTimeScope, out var lazyService)) return lazyService;
-
-      if (!_hybridServiceProvider._descriptors.TryGetValue(serviceType, out var descriptors) || descriptors.Count <= 0) return null;
-
-      // Always use the last registered service when multiple registrations exist
-      var descriptor = descriptors[^1];
-      return _hybridServiceProvider.ResolveService(descriptor, this, _hybridServiceProvider._compileTimeServiceProvider);
     }
 
     /// <summary>
@@ -396,17 +399,8 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     /// <param name="serviceKey">The key of the service to get.</param>
     /// <returns>The service object or null if not found.</returns>
     public object? GetKeyedService(Type serviceType, object? serviceKey) {
-      if (serviceKey is null) {
-        return GetService(serviceType);
-      }
+      return serviceKey is null ? GetService(serviceType) : _hybridServiceProvider.GetKeyedService(serviceType, serviceKey, this);
 
-      if (!_hybridServiceProvider._keyedDescriptors.TryGetValue(serviceType, out var keyedServices) ||
-          !keyedServices.TryGetValue(serviceKey, out var descriptors) ||
-          descriptors.Count <= 0) return null;
-
-      // Always use the last registered service when multiple registrations exist
-      var descriptor = descriptors[^1];
-      return _hybridServiceProvider.ResolveService(descriptor, this, _hybridServiceProvider._compileTimeServiceProvider);
     }
 
     /// <summary>
@@ -425,12 +419,12 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       return service;
     }
 
-    internal object? ResolveService(ServiceDescriptor descriptor) {
+    internal object? ResolveService(Type serviceType, ServiceDescriptor descriptor) {
       if (_scopedInstances.TryGetValue(descriptor, out var instance)) {
         return instance;
       }
 
-      var service = CreateServiceInstance(descriptor, CompileTimeScope);
+      var service = CreateServiceInstance(serviceType, descriptor, CompileTimeScope);
       if (service is null) return service;
 
       _scopedInstances[descriptor] = service;

@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Generation;
 using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Utils;
 
@@ -231,7 +232,10 @@ public record ServiceInjection {
   /// such as including or excluding member-specific details. It is primarily used to format
   /// method names for display or serialization purposes within dependency injection configurations.
   /// </remarks>
-  private static readonly SymbolDisplayFormat MethodNameFormat = new(memberOptions: SymbolDisplayMemberOptions.None);
+  private static readonly SymbolDisplayFormat MethodNameFormat = new(
+      memberOptions: SymbolDisplayMemberOptions.None,
+      genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+      typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
 
   /// <summary>
   /// Creates a new <see cref="ServiceInjection"/> instance based on the specified
@@ -252,7 +256,7 @@ public record ServiceInjection {
   public static ServiceInjection FromResolution(ServiceRegistration registration,
                                                 IReadOnlyCollection<ParameterResolution> parameters) {
     var isStandardService = registration.ImplementationType is null && registration.CollectedServices is null;
-    var associatedMethod = registration.AssociatedSymbol as IMethodSymbol;
+    var associatedMethod = registration.AssociatedSymbol is IMethodSymbol method ? method.ValidateFactoryMethod(registration.Type) : null;
     
     return new ServiceInjection {
         ServiceType = registration.Type.ToDisplayString(),
