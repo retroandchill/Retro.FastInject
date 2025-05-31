@@ -1478,9 +1478,11 @@ public class ServiceManifestTest {
 
     Assert.That(stringResolution, Is.Not.Null);
     Assert.That(stringResolution.Parameters, Has.Count.EqualTo(1));
-    Assert.That(stringResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IRepository<string>"));
+    Assert.Multiple(() => {
+      Assert.That(stringResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IRepository<string>"));
 
-    Assert.That(intResolution, Is.Not.Null);
+      Assert.That(intResolution, Is.Not.Null);
+    });
     Assert.That(intResolution.Parameters, Has.Count.EqualTo(1));
     Assert.That(intResolution.Parameters[0].Parameter.Type.ToDisplayString(), Is.EqualTo("Test.IRepository<int>"));
   }

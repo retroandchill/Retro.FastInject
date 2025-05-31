@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Core;
+using Retro.FastInject.Core.Exceptions;
 
 namespace Retro.FastInject.Dynamic;
 
@@ -107,7 +108,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       try {
         return descriptors
             .Select(x => ResolveService(serviceType, x, GetRootScope(), _compileTimeServiceProvider))
-            .SingleOrDefault();
+            .Single();
       } catch (InvalidOperationException ex) {
         throw new DependencyResolutionException($"Multiple services of type '{serviceType}' are registered.", ex);
       }
@@ -293,7 +294,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       }
 
       if (descriptor.KeyedImplementationType is null) return null;
-      implementationType = descriptor.KeyedImplementationType;
+      implementationType = SpecializeIfNeeded(serviceType, descriptor.KeyedImplementationType);
     } else {
       if (descriptor.ImplementationFactory is not null) {
         return descriptor.ImplementationFactory(currentScope);
@@ -303,11 +304,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       }
       
       if (descriptor.ImplementationType is null) return null;
-      implementationType = descriptor.ImplementationType;
-    }
-
-    if (implementationType.ContainsGenericParameters) {
-      implementationType = implementationType.MakeGenericType(serviceType.GenericTypeArguments);
+      implementationType = SpecializeIfNeeded(serviceType, descriptor.ImplementationType);
     }
     
     try {
@@ -315,6 +312,9 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     } catch (Exception ex) {
       throw new DependencyResolutionException($"Error resolving service '{descriptor.ServiceType}'", ex);
     }
+  }
+  private static Type SpecializeIfNeeded(Type serviceType, Type implementationType) {
+    return implementationType.ContainsGenericParameters ? implementationType.MakeGenericType(serviceType.GenericTypeArguments) : implementationType;
   }
   private static object? ResolveConstructorParameters(ICompileTimeServiceProvider currentScope, Type implementationType) {
     // Find constructor with the most parameters that we can resolve
