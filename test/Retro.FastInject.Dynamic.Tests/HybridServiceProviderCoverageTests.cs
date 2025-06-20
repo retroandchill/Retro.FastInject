@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Retro.FastInject.Annotations;
+using Retro.FastInject.Core.Exceptions;
 
 namespace Retro.FastInject.Dynamic.Tests;
 
@@ -79,20 +80,16 @@ public class HybridServiceProviderCoverageTests {
   }
 
   [Test]
-  public void GetService_MultipleRegistrations_ReturnsLastOne() {
+  public void GetService_MultipleRegistrations_ReturnsThrowsException() {
     // Arrange
     var services = new ServiceCollection();
-    services.AddSingleton<MultiRegistrationService>(new MultiRegistrationService("First"));
-    services.AddSingleton<MultiRegistrationService>(new MultiRegistrationService("Second"));
-    services.AddSingleton<MultiRegistrationService>(new MultiRegistrationService("Last"));
+    services.AddSingleton(new MultiRegistrationService("First"));
+    services.AddSingleton(new MultiRegistrationService("Second"));
+    services.AddSingleton(new MultiRegistrationService("Last"));
     var provider = new TestCoverageServiceProvider(services);
 
     // Act
-    var service = provider.GetService<MultiRegistrationService>();
-
-    // Assert
-    Assert.That(service, Is.Not.Null);
-    Assert.That(service!.Name, Is.EqualTo("Last"));
+    Assert.Throws<DependencyResolutionException>(() => provider.GetService<MultiRegistrationService>());
   }
 
   [Test]

@@ -9,7 +9,9 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Comparers;
+using Retro.FastInject.Model.Attributes;
 using Retro.FastInject.Utils;
+using Retro.SourceGeneratorUtilities.Utilities.Attributes;
 
 namespace Retro.FastInject.Generation;
 
@@ -127,18 +129,14 @@ public static class ResolutionExtensions {
         Parameter = parameter,
         ParameterType = paramType,
         IsNullable = isNullable,
-        UseDynamic = serviceManifest.AllowDynamicResolution && parameter.GetAttribute<AllowDynamicAttribute>() is not null
+        UseDynamic = serviceManifest.AllowDynamicResolution && parameter.HasAttribute<AllowDynamicAttribute>()
     };
 
     // Check for FromKeyedServices attribute
-    var fromKeyedServicesAttr = parameter.GetAttributes()
-        .FirstOrDefault(a => a.IsOfAttributeType<FromKeyedServicesAttribute>());
-
-    string? keyName = null;
-    if (fromKeyedServicesAttr is { ConstructorArguments.Length: > 0 }) {
-      keyName = fromKeyedServicesAttr.ConstructorArguments[0].Value?.ToString();
-    }
-
+    var keyName = parameter.GetAttributes()
+        .Select(a => a.TryGetFromKeyedServicesOverview(out var info) ? info : null)
+        .Select(o => o?.Key)
+        .FirstOrDefault();
     parameterResolution.Key = keyName;
   
     var canResolve = serviceManifest.CanResolve(keyName, paramType, parameterResolution, compilation, 
@@ -303,9 +301,8 @@ public static class ResolutionExtensions {
     if (!serviceManifest.TryGetServices(elementType, out var elementServices)) {
       elementServices = [];
     }
-
-    var requireNonEmptyAttribute = targetParameter.GetAttribute<RequireNonEmptyAttribute>();
-    if (requireNonEmptyAttribute is not null && elementServices.Count == 0) {
+    
+    if (targetParameter.HasAttribute<RequireNonEmptyAttribute>() && elementServices.Count == 0) {
       selectedService = null;
       return false;
     }

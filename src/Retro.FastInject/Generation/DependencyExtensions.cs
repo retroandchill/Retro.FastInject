@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Comparers;
+using Retro.FastInject.Model.Attributes;
 using Retro.FastInject.Model.Detection;
 using Retro.FastInject.Model.Manifest;
 using Retro.FastInject.Utils;
@@ -32,26 +33,19 @@ public static class DependencyExtensions {
     // Get services from class attributes
     var attributeServices = classSymbol.GetAttributes()
         .SelectMany(x => {
-          if (x.IsOfAttributeType<ServiceProviderAttribute>()) {
-            allowDynamicServices = allowDynamicServices || x.NamedArguments
-                .Where(y => y.Key == nameof(ServiceProviderAttribute.AllowDynamicRegistrations))
-                .Select(y => y.Value.Value)
-                .FirstOrDefault() is true;
+          if (x.TryGetServiceProviderOverview(out var serviceProviderOverview)) {
+            allowDynamicServices = allowDynamicServices || serviceProviderOverview.AllowDynamicRegistrations;
             return [];
           }
           
-          if (x.IsOfAttributeType<DependencyAttribute>()) {
-            return [GetServiceDeclaration(x)];
+          if (x.TryGetDependencyOverview(out var dependencyOverview)) {
+            return [GetServiceDeclaration(dependencyOverview)];
           }
 
-          if (!x.IsOfAttributeType<ImportAttribute>()) return [];
-
-          var importedType = x.ImportedType();
-          allowDynamicServices = allowDynamicServices || x.NamedArguments
-              .Where(y => y.Key == nameof(ServiceProviderAttribute.AllowDynamicRegistrations))
-              .Select(y => y.Value.Value)
-              .FirstOrDefault() is true;
-          return alreadyImported.Add(importedType) ? importedType.GetInjectedServices() : [];
+          if (!x.TryGetImportOverview(out var importOverview)) return [];
+          
+          allowDynamicServices = allowDynamicServices || importOverview.AllowDynamicRegistrations;
+          return alreadyImported.Add(importOverview.ModuleType) ? importOverview.ModuleType.GetInjectedServices() : [];
         });
 
     // Get services from factory methods
@@ -74,67 +68,9 @@ public static class DependencyExtensions {
     return new ServiceDeclarationCollection(namedClassSymbol, services, allowDynamicServices);
   }
 
-  private static ITypeSymbol ImportedType(this AttributeData attribute) {
-    if (attribute.AttributeClass is null) {
-      throw new InvalidOperationException();
-    }
-
-    ITypeSymbol? importedType;
-    if (attribute.AttributeClass.IsGenericType) {
-      importedType = attribute.AttributeClass.TypeArguments[0];
-    } else {
-      importedType = attribute.ConstructorArguments[0].Value as ITypeSymbol;
-    }
-
-    if (importedType is null) {
-      throw new InvalidOperationException();
-    }
-
-    return importedType;
-  }
-
-  private static ServiceDeclaration GetServiceDeclaration(AttributeData attribute) {
-    var (injectedType, scope) = attribute.GetResolvedDependencyArguments();
-
-    // Get the Key property value if it exists
-    var key = attribute.NamedArguments
-        .FirstOrDefault(kvp => kvp.Key == "Key")
-        .Value.Value?.ToString();
-
-    return new ServiceDeclaration(injectedType is INamedTypeSymbol { IsUnboundGenericType: true} unbound 
-                                      ? unbound.ConstructedFrom : injectedType, scope, key);
-  }
-
-  private static ResolvedDependencyArguments GetResolvedDependencyArguments(this AttributeData attribute) {
-    if (attribute.AttributeClass is null) {
-      throw new InvalidOperationException();
-    }
-
-    ITypeSymbol? serviceType;
-    if (attribute.AttributeClass.IsGenericType) {
-      serviceType = attribute.AttributeClass.TypeArguments[0];
-    } else {
-      serviceType = attribute.ConstructorArguments[0].Value as ITypeSymbol;
-    }
-
-    if (serviceType is null) {
-      throw new InvalidOperationException();
-    }
-
-    ServiceScope scope;
-    if (attribute.IsOfAttributeType<SingletonAttribute>()) {
-      scope = ServiceScope.Singleton;
-    } else if (attribute.IsOfAttributeType<ScopedAttribute>()) {
-      scope = ServiceScope.Scoped;
-    } else if (attribute.IsOfAttributeType<TransientAttribute>()) {
-      scope = ServiceScope.Transient;
-    } else {
-      scope = attribute.ConstructorArguments[1].Value is int s 
-              && Enum.IsDefined(typeof(ServiceScope), s) 
-          ? (ServiceScope) s : ServiceScope.Singleton;
-    }
-
-    return new ResolvedDependencyArguments(serviceType, scope);
+  private static ServiceDeclaration GetServiceDeclaration(DependencyOverview attributeInfo) {
+    return new ServiceDeclaration(attributeInfo.Type is INamedTypeSymbol { IsUnboundGenericType: true} unbound 
+                                      ? unbound.ConstructedFrom : attributeInfo.Type, attributeInfo.Scope, attributeInfo.Key);
   }
 
   /// <summary>
@@ -209,22 +145,12 @@ public static class DependencyExtensions {
   }
 
   private static IEnumerable<ServiceDeclaration> GetFactoryServices(IMethodSymbol methodSymbol) {
-    var factoryAttribute = methodSymbol.GetAttribute<FactoryAttribute>();
+    var factoryAttribute = methodSymbol.GetAttributes()
+        .Select(a => a.TryGetFactoryOverview(out var info) ? info : null)
+        .FirstOrDefault();
     if (factoryAttribute == null) {
       return [];
     }
-
-    // Extract the service scope from the attribute
-    var scope = ServiceScope.Singleton; // Default is Singleton
-    if (factoryAttribute.ConstructorArguments.Length > 0 &&
-        factoryAttribute.ConstructorArguments[0].Value is int scopeValue) {
-      scope = (ServiceScope)scopeValue;
-    }
-
-    // Extract the key (if any) from the named arguments
-    var key = factoryAttribute.NamedArguments
-        .FirstOrDefault(kvp => kvp.Key == "Key")
-        .Value.Value?.ToString();
 
     var returnType = methodSymbol.ReturnType;
     if (methodSymbol is {
@@ -234,19 +160,16 @@ public static class DependencyExtensions {
       returnType = generic.ConstructedFrom;
     }
 
-    return [new ServiceDeclaration(returnType, scope, key, methodSymbol)];
+    return [new ServiceDeclaration(returnType, factoryAttribute.Scope, factoryAttribute.Key, methodSymbol)];
   }
 
   private static IEnumerable<ServiceDeclaration> GetInstanceServices(ISymbol memberSymbol) {
-    var instanceAttribute = memberSymbol.GetAttributes().SingleOrDefault(a => a.IsOfAttributeType<InstanceAttribute>());
+    var instanceAttribute = memberSymbol.GetAttributes()
+        .Select(a => a.TryGetInstanceOverview(out var info) ? info : null)
+        .SingleOrDefault();
     if (instanceAttribute is null) {
       return [];
     }
-
-    // Extract the key (if any) from the named arguments
-    var key = instanceAttribute.NamedArguments
-        .FirstOrDefault(kvp => kvp.Key == "Key")
-        .Value.Value?.ToString();
 
     var memberType = memberSymbol switch {
         IFieldSymbol fieldSymbol => fieldSymbol.Type,
@@ -259,6 +182,6 @@ public static class DependencyExtensions {
     }
 
     // Instance services are always Singleton scope
-    return [new ServiceDeclaration(memberType, ServiceScope.Singleton, key, memberSymbol)];
+    return [new ServiceDeclaration(memberType, ServiceScope.Singleton, instanceAttribute.Key, memberSymbol)];
   }
 }
