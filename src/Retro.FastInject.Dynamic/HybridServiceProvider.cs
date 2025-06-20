@@ -107,7 +107,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
       // Always use the last registered service when multiple registrations exist
       try {
         return descriptors
-            .Select(x => ResolveService(serviceType, x, GetRootScope(), _compileTimeServiceProvider))
+            .Select(x => ResolveService(serviceType, x, currentScope, _compileTimeServiceProvider))
             .Single();
       } catch (InvalidOperationException ex) {
         throw new DependencyResolutionException($"Multiple services of type '{serviceType}' are registered.", ex);
@@ -221,7 +221,7 @@ public sealed class HybridServiceProvider<T> : IKeyedServiceProvider where T : I
     // If we can't isolate to a single service, we should fail
     try {
       return keyedServices
-          .Where(x => x.IsKeyedService && x.ServiceKey == serviceKey)
+          .Where(x => x.IsKeyedService && (x.ServiceKey?.Equals(serviceKey) ?? false))
           .Select(x => ResolveService(serviceType, x, currentScope, _compileTimeServiceProvider))
           .SingleOrDefault();
     } catch (InvalidOperationException ex) {

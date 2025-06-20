@@ -56,4 +56,7 @@ jobs:
           .\.sonar\scanner\dotnet-sonarscanner begin /k:"retroandchill_Retro.FastInject" /o:"fcorso2016" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml /d:sonar.exclusions="examples/**/*"
           dotnet build
           dotnet-coverage collect "dotnet test" -f xml -o "coverage.xml"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
           .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"

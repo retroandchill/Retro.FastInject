@@ -10,31 +10,6 @@ namespace Retro.FastInject.Utils;
 /// </summary>
 public static class TypeExtensions {
   /// <summary>
-  /// Checks if the type represented by the current <see cref="ITypeSymbol"/> is of the specified type <typeparamref name="T"/>.
-  /// </summary>
-  /// <typeparam name="T">The type to compare against.</typeparam>
-  /// <param name="type">The current type symbol to check.</param>
-  /// <returns>
-  /// True if the current type symbol is of the specified type; otherwise, false.
-  /// </returns>
-  public static bool IsOfType<T>(this ITypeSymbol type) {
-    if (type.ToString() == typeof(T).FullName) {
-      return true;
-    }
-
-    if (typeof(T).IsClass && type is { TypeKind: TypeKind.Class, BaseType: not null }) {
-      return type.BaseType.IsOfType<T>();
-    }
-
-    if (typeof(T).IsInterface && type.TypeKind is TypeKind.Interface or TypeKind.Class) {
-      return type.Interfaces
-          .Any(i => i.IsOfType<T>());
-    }
-
-    return false;
-  }
-
-  /// <summary>
   /// Determines whether the specified interface type is valid for use as a type argument in the current context.
   /// </summary>
   /// <param name="interfaceType">The interface type represented as an <see cref="ITypeSymbol"/> to validate.</param>
