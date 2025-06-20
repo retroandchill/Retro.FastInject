@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Retro.FastInject.Annotations;
 using Retro.FastInject.Comparers;
 using Retro.FastInject.Utils;
+using Retro.SourceGeneratorUtilities.Utilities.Types;
 
 namespace Retro.FastInject.Model.Manifest;
 
@@ -94,7 +95,7 @@ public class ServiceManifest {
                         || !namedType.TypeArguments.Any(y => y is ITypeParameterSymbol)),
         AssociatedSymbol = associatedSymbol,
         CollectedServices = collectedServices,
-        IsDisposable = serviceType.AllInterfaces.Any(i => i.IsOfType<IDisposable>()),
+        IsDisposable = serviceType.AllInterfaces.Any(i => i.IsAssignableTo<IDisposable>()),
         IsAsyncDisposable = serviceType.AllInterfaces.Any(i => i.ToDisplayString() == "System.IAsyncDisposable")
     };
     registrations.Add(registration);

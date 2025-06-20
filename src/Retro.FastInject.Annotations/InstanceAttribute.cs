@@ -18,4 +18,17 @@ namespace Retro.FastInject.Annotations;
 /// </example>
 /// <seealso cref="Attribute"/>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
-public class InstanceAttribute : Attribute;
+public class InstanceAttribute : Attribute {
+
+  /// <summary>
+  /// Gets or initializes the unique identifier associated with the instance dependency.
+  /// </summary>
+  /// <remarks>
+  /// This property can be used to specify a distinct key for the annotated dependency,
+  /// enabling differentiation of multiple instances managed by the dependency injection container.
+  /// It is particularly useful when resolving dependencies with the same type but requiring specific
+  /// identification within the dependency injection configuration.
+  /// </remarks>
+  public string? Key { get; init; }
+  
+}

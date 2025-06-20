@@ -212,8 +212,6 @@ public class ServiceProviderGenerator : IIncrementalGenerator {
 
     var templateResult = template(templateParams);
     context.AddSource($"{classSymbol.Name}.g.cs", templateResult);
-
-    Console.WriteLine(manifest.ToString());
   }
   
   private static void ValidateConstructors(in ServiceDeclarationCollection declaration, SourceProductionContext context) {

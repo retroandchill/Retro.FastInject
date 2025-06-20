@@ -225,8 +225,11 @@ internal class TestParameterSymbol(IParameterSymbol original, bool hasDefaultVal
 
   // Delegate all other members to the original parameter
   public RefKind RefKind => original.RefKind;
+  public ScopedKind ScopedKind => original.ScopedKind;
 
   public bool IsParams => original.IsParams;
+  public bool IsParamsArray => original.IsParamsArray;
+  public bool IsParamsCollection => original.IsParamsCollection;
 
   public bool IsOptional => original.IsOptional;
 
