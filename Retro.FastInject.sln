@@ -24,6 +24,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Retro.FastInject.Dynamic.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Retro.FastInject.Sample.WebApi", "examples\Retro.FastInject.Sample.WebApi\Retro.FastInject.Sample.WebApi.csproj", "{9D6A027F-B9C0-4911-B9AC-82BA415379D7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Retro.FastInject.Sample.Cli", "examples\Retro.FastInject.Sample.Cli\Retro.FastInject.Sample.Cli.csproj", "{44E73674-D003-4A3D-8C5E-92AA278EEC21}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -66,6 +68,10 @@ Global
 		{9D6A027F-B9C0-4911-B9AC-82BA415379D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9D6A027F-B9C0-4911-B9AC-82BA415379D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9D6A027F-B9C0-4911-B9AC-82BA415379D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44E73674-D003-4A3D-8C5E-92AA278EEC21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44E73674-D003-4A3D-8C5E-92AA278EEC21}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44E73674-D003-4A3D-8C5E-92AA278EEC21}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44E73674-D003-4A3D-8C5E-92AA278EEC21}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{DE2568C7-8C6D-465F-8455-CACDA9415BEE} = {C45D859A-734C-4ED8-AC17-A5306EFFA8FE}
@@ -77,5 +83,6 @@ Global
 		{AC1481D0-3BF3-4AE0-84EC-6E6AF4956C10} = {BADFD506-8C99-4284-A8F4-D794DFC177C7}
 		{6BB76A22-977A-4C59-89B1-1A01602D416B} = {BADFD506-8C99-4284-A8F4-D794DFC177C7}
 		{9D6A027F-B9C0-4911-B9AC-82BA415379D7} = {97FFCE55-4D10-43FC-9883-8B597200F8CF}
+		{44E73674-D003-4A3D-8C5E-92AA278EEC21} = {97FFCE55-4D10-43FC-9883-8B597200F8CF}
 	EndGlobalSection
 EndGlobal
