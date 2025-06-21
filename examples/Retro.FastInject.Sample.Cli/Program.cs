@@ -1,9 +1,6 @@
-﻿using ConsoleAppFramework;
+﻿using DotMake.CommandLine;
 using Retro.FastInject.Sample.Cli;
 using Retro.FastInject.Sample.Cli.Services;
 
-var serviceProvider = new CliServiceProvider();
-var app = ConsoleApp.Create();
-app.Add<RootCliCommand>();
-
-await app.RunAsync(args);
+Cli.Ext.SetServiceProvider(new CliServiceProvider());
+await Cli.RunAsync<RootCliCommand>();

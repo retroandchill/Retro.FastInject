@@ -14,10 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="ConsoleAppFramework" Version="5.4.1">
-        <PrivateAssets>all</PrivateAssets>
-        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      </PackageReference>
+      <PackageReference Include="DotMake.CommandLine" Version="2.4.3" />
     </ItemGroup>
 
 </Project>
